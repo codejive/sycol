@@ -415,6 +415,7 @@ to add a Tcl procedure.
 | `file exists path`, `file isfile path`, `file isdirectory path` | Return 0 or 1, following links; missing or inaccessible paths return 0 |
 | `file size path` | Return byte length as a decimal string, following links; missing paths fail |
 | `file join name ?name ...?` | Join path components using Tcl's host path rules and `/` separators; a rooted or leading-home component resets earlier components |
+| `file pathtype path` | Classify a path lexically as `absolute`, `relative`, or `volumerelative` using the host's path rules |
 | `file dirname path`, `file tail path` | Return the parent or final component using host path rules, ignoring trailing separators |
 | `file extension path`, `file rootname path` | Return the final extension (including its dot), or the original path with that extension removed |
 
@@ -435,8 +436,14 @@ argument counts are errors. `-recursive` and `-attributes` are not supported;
 recursion and metadata preservation follow Tcl's defaults instead. Deleting
 zero paths or an empty path succeeds. An empty source or target for copy is an
 error. Tcl-compatible subcommand abbreviations start with `co`, `de`, `ty`,
-`mk`, `exi`, `isf`, `isd`, `j`, `di`, `ta`, `ext`, `ro`, `si`, and `ren` for the
+`mk`, `exi`, `isf`, `isd`, `j`, `di`, `ta`, `ext`, `ro`, `si`, `ren`, and `p` for the
 supported operations. Ambiguous prefixes such as `c`, `d`, and `t` fail.
+`file pathtype` does not access the filesystem or require the path to exist.
+Empty paths are relative; leading `~` (including `~user`) is absolute without
+performing home lookup. On Unix, leading `/` is absolute. On Windows, drive-rooted
+paths such as `C:/data` and UNC paths containing server and share are absolute;
+`C:data`, `C:`, and paths rooted on the current drive such as `/data` or `\data`
+are `volumerelative`. Other paths are relative.
 `file type` examines the entry itself, including dangling links. Trailing
 directory separators are ignored when identifying the final entry.
 

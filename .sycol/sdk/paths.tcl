@@ -38,6 +38,17 @@ proc sy.path.parts {path windows} {
     }
     list $root $names
 }
+proc sy.path.type {path windows} {
+    if [eq [string range $path 0 0] ~] { return absolute }
+    set root [lindex [sy.path.parts $path $windows] 0]
+    if [eq $root {}] { return relative }
+    if $windows {
+        if [or {eq $root /} {and {== [string length $root] 2} {eq [string range $root 1 1] :}}] {
+            return volumerelative
+        }
+    }
+    return absolute
+}
 proc sy.path.render {root names} {
     set result $root
     foreach name $names {

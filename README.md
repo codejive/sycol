@@ -43,6 +43,9 @@ An existing target directory receives each source under its basename; overwritin
 an existing file requires `-force`. Copy, rename, and delete accept multiple paths.
 Rename supports cross-filesystem moves by copying and then deleting the source
 after a successful copy; these moves are not atomic.
+`file pathtype $path` returns `absolute`, `relative`, or `volumerelative` using
+the host's path rules, without requiring the path to exist. On Windows,
+`C:data` and `/data` are volume-relative; `C:/data` is absolute.
 Deleting a missing path succeeds; deleting a nonempty directory needs `-force`.
 `exit` defaults to 0, accepts statuses 0–255, and terminates immediately even
 inside `catch`. Bash uses standard `cp`, `mv`, `mkdir`, `rm`, `rmdir`, `chmod`, and `stat` utilities;

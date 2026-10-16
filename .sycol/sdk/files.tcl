@@ -1,7 +1,7 @@
 # Shared option parsing; sy.file supplies only host filesystem operations.
 proc file {operation args} {
     # These abbreviations are unambiguous in full Tcl's larger file command.
-    foreach entry {{copy 2} {delete 2} {type 2} {mkdir 2} {exists 3} {isfile 3} {isdirectory 3} {join 1} {dirname 2} {tail 2} {extension 3} {rootname 2} {size 2} {rename 3}} {
+    foreach entry {{copy 2} {delete 2} {type 2} {mkdir 2} {exists 3} {isfile 3} {isdirectory 3} {join 1} {dirname 2} {tail 2} {extension 3} {rootname 2} {size 2} {rename 3} {pathtype 1}} {
         set command [lindex $entry 0]
         if [and {>= [string length $operation] [lindex $entry 1]} {eq $operation [string range $command 0 [- [string length $operation] 1]]}] { set operation $command }
     }
@@ -13,9 +13,12 @@ proc file {operation args} {
         if [== [llength $args] 0] { error {wrong # args: file join name ?name ...?} }
         return [sy.path.join $args [sy.file windows]]
     }
-    foreach command {dirname tail extension rootname} {
+    foreach command {dirname tail extension rootname pathtype} {
         if [eq $operation $command] {
             if [!= [llength $args] 1] { error "wrong # args: file $operation path" }
+            if [eq $operation pathtype] {
+                return [sy.path.type [lindex $args 0] [sy.file windows]]
+            }
             if [or {eq $operation extension} {eq $operation rootname}] {
                 return [sy.path.extension $operation [lindex $args 0] [sy.file windows]]
             }
