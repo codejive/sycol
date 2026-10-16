@@ -68,6 +68,15 @@ test list-roundtrip {
     eq $values $copy
 } 1
 test malformed-list { llength "\{" } {missing close brace} 1
+test foreach-malformed-list { foreach x "a \{" {error body-ran} } {missing close brace} 1
+test concat-malformed-list { concat {ok} "a \{" } {missing close brace} 1
+test join-malformed-list { join "a \{" } {missing close brace} 1
+test foreach-keeps-original-items {
+    set items {a b c}
+    set result {}
+    foreach item $items { set items {}; lappend result $item }
+    set result
+} {a b c}
 test negative-index-error { lindex {a} nope } {expected integer: nope} 1
 test string-length { string length abc } 3
 test string-equal { list [eq A a] [ne A a] [eq {} {}] } {0 1 1}

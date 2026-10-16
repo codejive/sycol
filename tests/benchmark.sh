@@ -22,7 +22,12 @@ measure() {
 printf 'Bash %s; locale %s; runtime %s\n' "$BASH_VERSION" "${LC_ALL:-${LANG:-unset}}" "$runtime"
 measure 'readfile 64 KiB' 5 sy_cmd_readfile "$temp/data.txt"
 measure 'load SDK' 5 load_sdk
+# measure captures timing in a subshell, so its SDK definitions do not persist.
+load_sdk
+if ((C)); then printf 'benchmark failed: %s\n' "$R" >&2; exit 1; fi
 measure 'file exists (SDK)' 5 eval_script 'file exists .sycol/VERSION'
+measure 'file invalid prefix (SDK)' 5 eval_script 'catch {file c a b}'
+measure 'pathtype long path (SDK)' 5 eval_script 'file pathtype relative/long-temporary-directory/another-segment/filesystem'
 measure 'file join long path (SDK)' 3 eval_script 'file join C:/sycol-benchmark/long-temporary-directory/another-segment/filesystem child'
 measure 'Windows path split (SDK)' 3 eval_script 'sy.path.parts {C:\sycol-benchmark\long-temporary-directory\another-segment\filesystem} 1'
 measure 'startup + hello example' 5 "$engine" "$runtime" examples/hello.tcl

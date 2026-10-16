@@ -9,11 +9,13 @@ proc lappend {name args} {
 
 proc concat {args} {
     set result {}
+    set count [llength $args]
     set i 0
-    while {< $i [llength $args]} {
+    while {< $i $count} {
         set part [lindex $args $i]
+        set partCount [llength $part]
         set j 0
-        while {< $j [llength $part]} {
+        while {< $j $partCount} {
             if [string length $result] { append result { } }
             append result [list [lindex $part $j]]
             incr j
@@ -25,8 +27,9 @@ proc concat {args} {
 
 proc join {items {separator { }}} {
     set result {}
+    set count [llength $items]
     set i 0
-    while {< $i [llength $items]} {
+    while {< $i $count} {
         if [> $i 0] { append result $separator }
         append result [lindex $items $i]
         incr i

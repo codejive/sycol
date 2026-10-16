@@ -57,6 +57,19 @@ test path-type-windows-drive-absolute { sy.path.type {C:\missing} 1 } absolute
 test path-type-windows-drive-slash { sy.path.type C:/missing 1 } absolute
 test path-type-windows-unc { sy.path.type {\\server\share\missing} 1 } absolute
 test path-type-windows-partial-unc { sy.path.type //server 1 } volumerelative
+
+test path-type-windows-unc-boundaries {
+    set result {}
+    foreach path {// /// //server/ //server/// ///server//share //server/share/ {\/server\share} {\\server\\share\tail} //./.. //server/share.txt/very/long/suffix} {
+        lappend result [sy.path.type $path 1]
+    }
+    set result
+} {volumerelative volumerelative volumerelative volumerelative absolute absolute absolute absolute absolute absolute}
+
+test path-unicode-components {
+    set parts [sy.path.parts {C:\é😀\名.txt} 1]
+    list [lindex $parts 0] [join [lindex $parts 1] /] [sy.path.extension extension {C:\é😀\名.txt} 1] [sy.path.extension rootname {C:\é😀\名.txt} 1]
+} {C:/ é😀/名.txt .txt C:\\é😀\\名}
 test path-type-windows-unc-colon { sy.path.type //server/share: 1 } absolute
 test path-type-windows-nonletter-drive { sy.path.type 1:missing 1 } volumerelative
 test path-type-windows-long-prefix { sy.path.type ab:/missing 1 } relative

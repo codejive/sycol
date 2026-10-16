@@ -2,8 +2,9 @@
 # Caller-script completion propagation adds this procedure boundary to return levels.
 
 proc foreach {name items body} {
+    set count [llength $items]
     set i 0
-    while {< $i [llength $items]} {
+    while {< $i $count} {
         uplevel 1 [list set $name [lindex $items $i]]
         set code [catch {uplevel 1 $body} value options]
         if [== $code 3] { break }

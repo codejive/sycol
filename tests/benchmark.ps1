@@ -29,6 +29,10 @@ try {
     Measure-SyCase 'readfile 64 KiB' 20 { Invoke-SyNativeRead 'readfile' @($path) }
     Measure-SyCase 'load SDK' 5 { Import-SySdk }
     Measure-SyCase 'file exists (SDK)' 5 { Invoke-SyScript 'file exists .sycol/VERSION' }
+    Measure-SyCase 'file invalid prefix (SDK)' 5 { Invoke-SyScript 'catch {file c a b}' }
+    Measure-SyCase 'pathtype long path (SDK)' 5 {
+        Invoke-SyScript 'file pathtype relative/long-temporary-directory/another-segment/filesystem'
+    }
     Measure-SyCase 'file join long path (SDK)' 3 {
         Invoke-SyScript 'file join C:/sycol-benchmark/long-temporary-directory/another-segment/filesystem child'
     }

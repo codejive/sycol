@@ -82,6 +82,21 @@ test file-abbreviations-dispatch {
 test file-abbreviations-invalid {
     list [catch {file c a b}] [catch {file d a}] [catch {file t a}] [catch {file join-extra a b}] [catch {file exi}]
 } {1 1 1 1 1}
+
+test file-abbreviations-suffix-errors {
+    set count 0
+    foreach operation {{} c d t m e ex i is r re s l li lis copyx deletex typex mkdirx existsx isfilex isdirectoryx joinx dirnamex tailx extensionx rootnamex sizex renamex pathtypex {co; error injected} {exi [error injected]}} {
+        set code [catch {file $operation {a b} {c d}} value]
+        if [!= $code 1] { error "accepted invalid operation: $operation" }
+        if [ne $value "unknown file operation: $operation"] { error $value }
+        incr count
+    }
+    set count
+} 32
+
+test file-abbreviations-canonical-arity {
+    list [catch {file exi} value] $value [catch {file ren a} value] $value
+} [list 1 {wrong # args: file exists path} 1 {wrong # args: file rename ?-force? ?--? source ?source ...? target}]
 test file-options {
     set count 0
     foreach script {{file} {file bogus} {file list a b} {file type} {file copy -recursive a b} {file copy -attributes a b} {file copy a} {file delete -attributes a} {file copy -bogus a b} {file delete -recursive a} {file copy {} a}} {
