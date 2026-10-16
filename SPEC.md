@@ -26,9 +26,10 @@ The files shipped together are:
 
 | File | Responsibility |
 | --- | --- |
-| `sycol` | Executable Bash parser, evaluator, native commands, file launcher |
+| `sycol` | Executable Bash parser, evaluator, native registry, file launcher |
 | `sycol.ps1` | PowerShell implementation of the same contract |
-| `lib/core.tcl` | Shared SDK procedures |
+| `lib/native/core.sh`, `lib/native/core.ps1` | Registered built-in native handlers |
+| `lib/sdk/*.tcl` | Shared SDK procedures, grouped by responsibility |
 | `tests/all.tcl` | Shared language and SDK conformance tests |
 | `tests/exec.tcl` | Shared process tests using small host probes |
 | `tests/run.sh`, `tests/run.ps1` | Temporary directories, host invocation, cleanup |
@@ -47,13 +48,16 @@ pwsh -NoProfile -File sycol.ps1 SCRIPT [ARG ...]
 
 The Bash file `sycol` is executable and starts with `#!/usr/bin/env bash`.
 Use `./sycol` from its directory, or `sycol` when its directory is on `PATH`.
-Explicit `bash /path/to/sycol` invocation is also supported. Keep `lib/core.tcl`
-beside the interpreter as described above.
+Explicit `bash /path/to/sycol` invocation is also supported. Keep the `lib/`
+directory beside the interpreter as described above.
 
 There are no launcher options. The first argument is always a filename. Missing
-that argument prints usage to stderr and exits 2. Startup initializes global
-variables, sources `lib/core.tcl` relative to the interpreter file, then sources
-the requested script in the global frame. Failure to load either file is fatal.
+that argument prints usage to stderr and exits 2. Sourcing the interpreter
+registers native handlers from `lib/native/`. Startup initializes global
+variables, sources the SDK files in `lib/sdk/`, then sources the requested
+script in the global frame. Library paths resolve relative to the interpreter
+file, even if an embedded caller changes the working directory before startup.
+Failure to discover or load a library, or to load the requested script, is fatal.
 The final script value is not printed automatically. `puts` produces output.
 
 | Global variable | Initial value |
@@ -142,9 +146,10 @@ with `::`. A final parameter named `args` collects all remaining arguments as
 a proper list, including zero arguments. Missing required or excess arguments
 are errors. Defaults are literal strings and are not evaluated.
 
-Dispatch checks script procedures, registered native extensions, and built-in
-primitives, in that order. Script definitions may override built-ins and SDK
-procedures. There is no implicit `unknown` handler or OS command fallback.
+Dispatch checks script procedures, then registered native handlers. Built-in
+primitives use the same registry as native extensions. Script definitions may
+override built-ins and SDK procedures. There is no implicit `unknown` handler
+or OS command fallback.
 There is no command deletion, rename operation, or introspection subsystem.
 
 ## 5. Completion semantics
@@ -321,9 +326,11 @@ export environment variables.
 
 ## 7. Shared Tcl SDK
 
-The launcher loads this SDK once per interpreter instance. Applications extend
-it by defining procedures or sourcing additional files. No host dispatcher
-change is needed to add a Tcl procedure.
+The launcher loads the SDK from all direct `.tcl` files in `lib/sdk/` before
+the requested script. The shipped files are `control.tcl`, `lists.tcl`,
+`strings.tcl`, and `variables.tcl`. Applications extend it by defining
+procedures or sourcing additional files. No host dispatcher change is needed
+to add a Tcl procedure.
 
 | Procedure | Contract |
 | --- | --- |
@@ -370,9 +377,34 @@ puts [git-status]
 Native extensions are trusted host code. They receive already decoded strings
 and set the interpreter's result/completion explicitly. They must validate
 arity, preserve caller frames, avoid unrequested stdout output, and translate
-host failures into code 1. No module search path or dynamic plugin loader is
-part of the core. A custom launcher registers handlers before calling `main`
-or `Start-Sycol`.
+host failures into code 1. The interpreter sources all direct `.sh` files
+(Bash) or dot-sources all direct `.ps1` files (PowerShell) in `lib/native/`
+when the interpreter itself is sourced. The shipped `core.sh` and `core.ps1`
+have no special filename treatment. Additional native files should only define
+helpers and register handlers, without invoking Sycol commands during loading.
+A custom launcher can also register handlers after sourcing the interpreter
+and before calling `main` or `Start-Sycol`.
+
+Both native and SDK discovery ignore subdirectories, filenames beginning with
+`.`, and files with another extension. Extensions are matched case-sensitively.
+Files load alphabetically with locale-independent sorting: C-locale glob order
+on Bash and ordinal string order on PowerShell. Use lowercase ASCII library
+filenames for identical ordering across hosts; non-ASCII filename ordering is
+not portable. Neither loader maintains a hard-coded list of filenames.
+Missing or unreadable library directories fail initialization; an existing
+empty directory contributes no definitions. A distribution still needs its
+shipped built-ins and SDK procedures to provide the specified language.
+Library load failures stop loading and identify the failing file, without
+rolling back definitions already installed. Native Bash files must return
+success after registration; PowerShell loading treats host errors as fatal.
+
+SDK files should only define procedures. Their bodies may refer to procedures
+defined in other files, since those names resolve when called. Files must not
+depend on another library file having already loaded. Repeated definitions
+follow the usual replacement rules; later native registrations replace earlier
+ones, and script procedures take precedence over every native handler.
+There is no recursive discovery, configurable module search path, or automatic
+loading of host files from the user's working directory.
 
 Bash:
 
@@ -416,7 +448,9 @@ parameter and must not emit pipeline objects; `puts` uses console output
 explicitly. Catch host exceptions and call `Set-SyError` yourself.
 
 Both files can be sourced without launching a script. An embedded caller may
-use the evaluator without loading the SDK, or explicitly load it with `source`.
+use the evaluator with native handlers but without the SDK, or explicitly load
+the SDK with `load_sdk` (Bash) or `Import-SySdk` (PowerShell). These helpers load
+in the current frame; normal launcher startup uses the global frame.
 They expose one mutable interpreter instance per sourcing, not a reentrant,
 thread-safe API. Native extension lookup is case-sensitive. Re-registering a
 native name replaces its effective handler; a script procedure still wins.
@@ -453,8 +487,10 @@ language error and therefore a failing process status. Separate process tests
 verify exact argument boundaries, newline trimming, inherited stderr, failed
 exit status, and current working directory using small host-specific probes.
 
-Drivers create unique temporary directories, clean only their generated file
-and empty directory, and propagate test failures. CI selects `/bin/bash` on
+Discovery tests copy an installation into a unique temporary directory and
+verify ordering, extension filtering, argument boundaries, overrides, embedding,
+empty discovery, and startup failures. Drivers clean their generated files and
+empty directories, and propagate test failures. CI selects `/bin/bash` on
 macOS to exercise the 3.2 target and runs Windows PowerShell 5.1 separately
 from PowerShell 7. CI also checks PowerShell on Unix. Local availability of a
 newer Bash does not establish that the 3.2 matrix has passed.

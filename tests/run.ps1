@@ -21,6 +21,8 @@ try {
     $probe=$script:Sy.R
     & $engine -NoProfile -ExecutionPolicy Bypass -File ./sycol.ps1 tests/exec.tcl $probe $temp
     if ($LASTEXITCODE) { throw 'Process suite failed' }
+    & $engine -NoProfile -ExecutionPolicy Bypass -File tests/discovery.ps1
+    if ($LASTEXITCODE) { throw 'Discovery suite failed' }
 } finally {
     Set-Location -LiteralPath $original.ProviderPath
     # Only the known generated file and this empty, unique directory are removed.

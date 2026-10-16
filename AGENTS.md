@@ -5,7 +5,7 @@
 - Read [SPEC.md](SPEC.md) before changing behavior; it defines the language,
   SDK, compatibility boundaries, and extension contracts. See [README.md](README.md)
   for usage and test commands.
-- Keep the core tiny. Prefer shared Tcl procedures in `lib/core.tcl` over new
+- Keep the core tiny. Prefer shared Tcl procedures in `lib/sdk/` over new
   native commands. Preserve file-only execution, explicit `exec`, and no infix
   expression parser unless the requested change explicitly revises that design.
 - Maintain equivalent behavior in `sycol` and `sycol.ps1`, including results,

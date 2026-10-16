@@ -42,8 +42,29 @@ script-signing workflow or add `-ExecutionPolicy Bypass` to that invocation.
 With its directory on `PATH`, run `sycol script.tcl [args ...]` directly.
 The Bash script is executable and uses its shebang to select Bash.
 
-The distribution is just `sycol` **or** `sycol.ps1`, plus `lib/core.tcl`
-next to it. Scripts can `source` additional Tcl files to extend the SDK.
+The distribution is `sycol` **or** `sycol.ps1`, plus the `lib/` directory
+next to it:
+
+```text
+lib/
+  native/
+    core.sh
+    core.ps1
+  sdk/
+    control.tcl
+    lists.tcl
+    strings.tcl
+    variables.tcl
+```
+
+Each interpreter automatically loads direct native files for its host (`.sh`
+or `.ps1`), then loads all direct SDK `.tcl` files before running your script.
+Use lowercase ASCII filenames; files load alphabetically, independently of
+the current locale. Dot-prefixed files and subdirectories are ignored.
+Native files define helpers and register commands; SDK files define procedures.
+Neither should invoke commands that require another library file during loading.
+Adding a file needs no launcher change. Scripts can also `source` additional
+Tcl files to extend the SDK for one application.
 See [the complete language and SDK specification](SPEC.md), including native
 extension examples, supported syntax, and deliberate Tcl differences.
 
@@ -60,7 +81,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/run.ps1
 pwsh -NoProfile -File tests/run.ps1
 ```
 
-Each driver runs the shared Tcl suite and process tests in its own host.
+Each driver runs the shared Tcl suite, process tests, and library discovery
+tests in its own host.
 Tests return a nonzero process status on failure and use an isolated temporary
 directory for generated files. CI covers macOS `/bin/bash` (the Bash 3.2
 target), current Linux Bash, Windows PowerShell, and PowerShell on Windows and

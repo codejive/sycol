@@ -15,3 +15,4 @@ if ((C)); then printf '%s\n' "$R" >&2; exit 1; fi
 quote_list "$(command -v "$engine")" "$root/tests/fixtures/probe.sh"
 probe=$R
 "$engine" ./sycol tests/exec.tcl "$probe" "$temp"
+"$engine" tests/discovery.sh
