@@ -26,7 +26,7 @@ The files shipped together are:
 
 | File | Responsibility |
 | --- | --- |
-| `sycol.sh` | Bash parser, evaluator, native commands, file launcher |
+| `sycol` | Executable Bash parser, evaluator, native commands, file launcher |
 | `sycol.ps1` | PowerShell implementation of the same contract |
 | `lib/core.tcl` | Shared SDK procedures |
 | `tests/all.tcl` | Shared language and SDK conformance tests |
@@ -40,10 +40,15 @@ these are not interpreter runtime dependencies.
 ## 2. Invocation and lifecycle
 
 ```
-bash sycol.sh SCRIPT [ARG ...]
+sycol SCRIPT [ARG ...]
 powershell -NoProfile -File sycol.ps1 SCRIPT [ARG ...]
 pwsh -NoProfile -File sycol.ps1 SCRIPT [ARG ...]
 ```
+
+The Bash file `sycol` is executable and starts with `#!/usr/bin/env bash`.
+Use `./sycol` from its directory, or `sycol` when its directory is on `PATH`.
+Explicit `bash /path/to/sycol` invocation is also supported. Keep `lib/core.tcl`
+beside the interpreter as described above.
 
 There are no launcher options. The first argument is always a filename. Missing
 that argument prints usage to stderr and exits 2. Startup initializes global
@@ -373,7 +378,7 @@ Bash:
 
 ```bash
 #!/usr/bin/env bash
-source /path/to/sycol/sycol.sh
+source /path/to/sycol/sycol
 host_echo() {
     if (($# != 1)); then arity 'host.echo value'; return; fi
     R=$1; C=0

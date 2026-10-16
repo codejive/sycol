@@ -1,12 +1,14 @@
 # Working on Sycol
 
+- Always use Conventional Commits when committing with Git. Describe the change
+  clearly without making commit messages overly verbose.
 - Read [SPEC.md](SPEC.md) before changing behavior; it defines the language,
   SDK, compatibility boundaries, and extension contracts. See [README.md](README.md)
   for usage and test commands.
 - Keep the core tiny. Prefer shared Tcl procedures in `lib/core.tcl` over new
   native commands. Preserve file-only execution, explicit `exec`, and no infix
   expression parser unless the requested change explicitly revises that design.
-- Maintain equivalent behavior in `sycol.sh` and `sycol.ps1`, including results,
+- Maintain equivalent behavior in `sycol` and `sycol.ps1`, including results,
   completion codes, argument boundaries, and errors. Support Bash 3.2+ and
   Windows PowerShell 5.1+ as specified; avoid newer host-only features.
 - For bug reports, reproduce the issue, check the intended behavior against the

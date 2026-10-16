@@ -1,3 +1,4 @@
 * text=auto eol=lf
 *.sh text eol=lf
+sycol text eol=lf
 *.tcl text eol=lf

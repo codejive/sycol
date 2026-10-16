@@ -26,7 +26,7 @@ puts [exec git --version]
 Run a file (paths are relative to the current working directory):
 
 ```sh
-bash sycol.sh examples/hello.tcl Alice 'Bob Smith'
+./sycol examples/hello.tcl Alice 'Bob Smith'
 ```
 
 ```powershell
@@ -39,7 +39,10 @@ Targets: **Bash 3.2+** with 64-bit shell arithmetic, and **Windows PowerShell
 If local Windows policy prevents running an unsigned script, use your normal
 script-signing workflow or add `-ExecutionPolicy Bypass` to that invocation.
 
-The distribution is just `sycol.sh` **or** `sycol.ps1`, plus `lib/core.tcl`
+With its directory on `PATH`, run `sycol script.tcl [args ...]` directly.
+The Bash script is executable and uses its shebang to select Bash.
+
+The distribution is just `sycol` **or** `sycol.ps1`, plus `lib/core.tcl`
 next to it. Scripts can `source` additional Tcl files to extend the SDK.
 See [the complete language and SDK specification](SPEC.md), including native
 extension examples, supported syntax, and deliberate Tcl differences.

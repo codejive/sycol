@@ -14,6 +14,11 @@ jobs:
         env:
           SYCOL_BASH: /bin/bash
         run: /bin/bash tests/run.sh
+      - name: Execute launcher directly and through PATH
+        run: |
+          test -x ./sycol
+          ./sycol examples/hello.tcl Alice
+          PATH="$PWD:$PATH" sycol examples/hello.tcl Alice
   powershell:
     runs-on: windows-latest
     strategy:

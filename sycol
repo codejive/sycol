@@ -377,7 +377,7 @@ dispatch() {
     esac
 }
 main() {
-    if (($#<1)); then printf 'usage: bash sycol.sh script.tcl [args ...]\n' >&2; return 2; fi
+    if (($#<1)); then printf 'usage: sycol script.tcl [args ...]\n' >&2; return 2; fi
     local script=$1 base=${BASH_SOURCE[0]%/*}; shift
     [[ $base == "${BASH_SOURCE[0]}" ]] && base=.
     quote_list "$@"; vset argv "$R"; vset argc "$#"; vset argv0 "$script"; vset sycol_host bash
