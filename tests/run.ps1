@@ -7,9 +7,9 @@ $original=Get-Location
 try {
     Set-Location -LiteralPath $root
     $engine=(Get-Process -Id $PID).Path
-    & $engine -NoProfile -ExecutionPolicy Bypass -File ./sycol.ps1 tests/all.tcl $temp 'argument with spaces; $literal [brackets]'
+    & $engine -NoProfile -ExecutionPolicy Bypass -File ./.sycol/bin/sycol.ps1 tests/all.tcl $temp 'argument with spaces; $literal [brackets]'
     if ($LASTEXITCODE) { throw 'Shared Tcl suite failed' }
-    . ./sycol.ps1
+    . ./.sycol/bin/sycol.ps1
     Register-SyNative host.echo {
         param([string[]]$Words)
         if ($Words.Count -ne 1) { Set-SyArity 'host.echo value'; return }
@@ -19,10 +19,12 @@ try {
     if ($script:Sy.C) { throw $script:Sy.R }
     ConvertTo-SyList @($engine,'-NoProfile','-ExecutionPolicy','Bypass','-File',"$root/tests/fixtures/probe.ps1")
     $probe=$script:Sy.R
-    & $engine -NoProfile -ExecutionPolicy Bypass -File ./sycol.ps1 tests/exec.tcl $probe $temp
+    & $engine -NoProfile -ExecutionPolicy Bypass -File ./.sycol/bin/sycol.ps1 tests/exec.tcl $probe $temp
     if ($LASTEXITCODE) { throw 'Process suite failed' }
     & $engine -NoProfile -ExecutionPolicy Bypass -File tests/discovery.ps1
     if ($LASTEXITCODE) { throw 'Discovery suite failed' }
+    & $engine -NoProfile -ExecutionPolicy Bypass -File tests/launchers.ps1
+    if ($LASTEXITCODE) { throw 'Launcher suite failed' }
 } finally {
     Set-Location -LiteralPath $original.ProviderPath
     # Only the known generated file and this empty, unique directory are removed.

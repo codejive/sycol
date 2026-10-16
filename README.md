@@ -30,23 +30,37 @@ Run a file (paths are relative to the current working directory):
 ```
 
 ```powershell
-powershell -NoProfile -File sycol.ps1 examples/hello.tcl Alice 'Bob Smith'
-pwsh -NoProfile -File sycol.ps1 examples/hello.tcl Alice 'Bob Smith'
+& ./.sycol/bin/sycol.ps1 examples/hello.tcl Alice 'Bob Smith'
+```
+
+From CMD:
+
+```bat
+sycol examples/hello.tcl Alice "Bob Smith"
 ```
 
 Targets: **Bash 3.2+** with 64-bit shell arithmetic, and **Windows PowerShell
 5.1+ / PowerShell 7+**. There is no REPL, stdin script mode, or `-c` mode.
 If local Windows policy prevents running an unsigned script, use your normal
-script-signing workflow or add `-ExecutionPolicy Bypass` to that invocation.
+script-signing workflow or launch it with
+`powershell -NoProfile -ExecutionPolicy Bypass -File .sycol/bin/sycol.ps1 ...`.
 
-With its directory on `PATH`, run `sycol script.tcl [args ...]` directly.
-The Bash script is executable and uses its shebang to select Bash.
+Add `.sycol/bin/` to `PATH` to run `sycol script.tcl [args ...]` directly.
+Bash selects the executable `sycol`, PowerShell on Windows selects `sycol.ps1`,
+and CMD selects `sycol.bat`. PowerShell users can specify `sycol.ps1` explicitly
+to bypass CMD argument parsing. The root `sycol` and `sycol.bat` wrappers
+provide project-local invocation without changing `PATH`.
 
-The distribution is `sycol` **or** `sycol.ps1`, plus the `lib/` directory
-next to it:
+Copy the two root wrappers and the entire `.sycol/` directory into your project:
 
 ```text
-lib/
+sycol
+sycol.bat
+.sycol/
+  bin/
+    sycol
+    sycol.ps1
+    sycol.bat
   native/
     core.sh
     core.ps1
@@ -56,6 +70,28 @@ lib/
     strings.tcl
     variables.tcl
 ```
+
+Launchers find the runtime relative to themselves and preserve the working
+directory and exit status. The batch launcher uses Windows PowerShell with
+`-NoProfile -ExecutionPolicy Bypass` for that process.
+
+CMD still applies its own syntax before a launcher receives arguments. Quote
+spaces and metacharacters, use `""` for an empty argument, and disable delayed
+expansion when passing literal `!`. Windows PowerShell's command-line parser
+also requires `\"` for a literal quote and doubled trailing backslashes before
+a closing quote. For example, from an interactive CMD prompt with delayed
+expansion off:
+
+```bat
+sycol scripts/build.tcl "" "two words" "say \"hello\"" "C:\some path\\" "a&b"
+```
+
+CMD expands `%NAME%` before launching; inside a calling batch file, literal
+percent signs need `%%`. The wrappers do not use `CALL` or re-expand arguments
+with delayed expansion. Combining literal quotes with CMD metacharacters in
+one argument requires escaping for each batch parsing pass; `\"` alone does
+not protect an `&` inside those literal quotes. For such arguments, invoke the
+`.ps1` entry point directly from PowerShell.
 
 Each interpreter automatically loads direct native files for its host (`.sh`
 or `.ps1`), then loads all direct SDK `.tcl` files before running your script.
@@ -81,8 +117,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/run.ps1
 pwsh -NoProfile -File tests/run.ps1
 ```
 
-Each driver runs the shared Tcl suite, process tests, and library discovery
-tests in its own host.
+Each driver runs the shared Tcl suite, process tests, library discovery, and
+launcher tests in its own host. On Windows these include both batch entry
+points and CMD quoting, PATH lookup, and exit status propagation.
 Tests return a nonzero process status on failure and use an isolated temporary
 directory for generated files. CI covers macOS `/bin/bash` (the Bash 3.2
 target), current Linux Bash, Windows PowerShell, and PowerShell on Windows and

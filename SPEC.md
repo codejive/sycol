@@ -26,10 +26,12 @@ The files shipped together are:
 
 | File | Responsibility |
 | --- | --- |
-| `sycol` | Executable Bash parser, evaluator, native registry, file launcher |
-| `sycol.ps1` | PowerShell implementation of the same contract |
-| `lib/native/core.sh`, `lib/native/core.ps1` | Registered built-in native handlers |
-| `lib/sdk/*.tcl` | Shared SDK procedures, grouped by responsibility |
+| `sycol`, `sycol.bat` | Project-local launchers |
+| `.sycol/bin/sycol` | Executable Bash parser, evaluator, native registry, file launcher |
+| `.sycol/bin/sycol.ps1` | PowerShell implementation of the same contract |
+| `.sycol/bin/sycol.bat` | CMD launcher for the adjacent PowerShell implementation |
+| `.sycol/native/core.sh`, `.sycol/native/core.ps1` | Registered built-in native handlers |
+| `.sycol/sdk/*.tcl` | Shared SDK procedures, grouped by responsibility |
 | `tests/all.tcl` | Shared language and SDK conformance tests |
 | `tests/exec.tcl` | Shared process tests using small host probes |
 | `tests/run.sh`, `tests/run.ps1` | Temporary directories, host invocation, cleanup |
@@ -42,19 +44,42 @@ these are not interpreter runtime dependencies.
 
 ```
 sycol SCRIPT [ARG ...]
-powershell -NoProfile -File sycol.ps1 SCRIPT [ARG ...]
-pwsh -NoProfile -File sycol.ps1 SCRIPT [ARG ...]
+powershell -NoProfile -File .sycol/bin/sycol.ps1 SCRIPT [ARG ...]
+pwsh -NoProfile -File .sycol/bin/sycol.ps1 SCRIPT [ARG ...]
+sycol.bat SCRIPT [ARG ...]
 ```
 
 The Bash file `sycol` is executable and starts with `#!/usr/bin/env bash`.
 Use `./sycol` from its directory, or `sycol` when its directory is on `PATH`.
-Explicit `bash /path/to/sycol` invocation is also supported. Keep the `lib/`
-directory beside the interpreter as described above.
+Explicit `bash /path/to/sycol` invocation is also supported. Keep `.sycol/`
+beside the root wrappers. The root Bash wrapper uses `exec` and forwards
+`"$@"`; both root wrappers locate the implementation relative to themselves
+without changing the working directory. Embedding must source the actual
+implementation in `.sycol/bin/`, not a root wrapper.
+
+The `.sycol/` directory is also a standalone distribution: add `.sycol/bin/`
+to `PATH` for Bash, PowerShell, or CMD invocation. PowerShell on Windows selects
+the `.ps1` entry point; CMD selects `.bat`. On other platforms, PowerShell users
+can explicitly invoke `sycol.ps1` on `PATH`. Both batch entry points use Windows
+PowerShell, with `-NoProfile -ExecutionPolicy Bypass` scoped to that process,
+and preserve its exit status. The root batch wrapper transfers control to the
+inner batch file without `CALL`; both disable delayed expansion internally.
+
+Argument boundaries are preserved after the invoking shell and Windows
+command-line parsing. CMD callers must quote metacharacters, supply empty
+arguments as `""`, escape literal quotes as `\"`, and double trailing
+backslashes before a closing quote for the Windows PowerShell parser.
+CMD percent expansion and caller-side delayed expansion still apply; wrappers
+cannot recover text already expanded by the caller. Literal quotes combined
+with CMD metacharacters require escaping for each batch parsing pass; arbitrary
+string forwarding through `.bat` is not guaranteed. Direct PowerShell `.ps1`
+invocation bypasses CMD and preserves its string arguments, including empty
+strings and embedded quotes.
 
 There are no launcher options. The first argument is always a filename. Missing
 that argument prints usage to stderr and exits 2. Sourcing the interpreter
-registers native handlers from `lib/native/`. Startup initializes global
-variables, sources the SDK files in `lib/sdk/`, then sources the requested
+registers native handlers from `.sycol/native/`. Startup initializes global
+variables, sources the SDK files in `.sycol/sdk/`, then sources the requested
 script in the global frame. Library paths resolve relative to the interpreter
 file, even if an embedded caller changes the working directory before startup.
 Failure to discover or load a library, or to load the requested script, is fatal.
@@ -326,7 +351,7 @@ export environment variables.
 
 ## 7. Shared Tcl SDK
 
-The launcher loads the SDK from all direct `.tcl` files in `lib/sdk/` before
+The launcher loads the SDK from all direct `.tcl` files in `.sycol/sdk/` before
 the requested script. The shipped files are `control.tcl`, `lists.tcl`,
 `strings.tcl`, and `variables.tcl`. Applications extend it by defining
 procedures or sourcing additional files. No host dispatcher change is needed
@@ -378,7 +403,7 @@ Native extensions are trusted host code. They receive already decoded strings
 and set the interpreter's result/completion explicitly. They must validate
 arity, preserve caller frames, avoid unrequested stdout output, and translate
 host failures into code 1. The interpreter sources all direct `.sh` files
-(Bash) or dot-sources all direct `.ps1` files (PowerShell) in `lib/native/`
+(Bash) or dot-sources all direct `.ps1` files (PowerShell) in `.sycol/native/`
 when the interpreter itself is sourced. The shipped `core.sh` and `core.ps1`
 have no special filename treatment. Additional native files should only define
 helpers and register handlers, without invoking Sycol commands during loading.
@@ -410,7 +435,7 @@ Bash:
 
 ```bash
 #!/usr/bin/env bash
-source /path/to/sycol/sycol
+source /path/to/project/.sycol/bin/sycol
 host_echo() {
     if (($# != 1)); then arity 'host.echo value'; return; fi
     R=$1; C=0
@@ -432,7 +457,7 @@ into internal state unless Sycol scripts are allowed to access them.
 PowerShell:
 
 ```powershell
-. /path/to/sycol/sycol.ps1
+. /path/to/project/.sycol/bin/sycol.ps1
 Register-SyNative host.echo {
     param([string[]]$Words)
     if ($Words.Count -ne 1) { Set-SyArity 'host.echo value'; return }

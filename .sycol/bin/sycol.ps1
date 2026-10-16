@@ -226,7 +226,7 @@ function Get-SyLibraryFiles([string]$Directory, [string]$Extension) {
     return $files
 }
 function Import-SySdk {
-    foreach ($file in @(Get-SyLibraryFiles "$script:SyHome/lib/sdk" '.tcl')) {
+    foreach ($file in @(Get-SyLibraryFiles "$script:SyHome/../sdk" '.tcl')) {
         Invoke-SyCommand @('source',$file)
         if ($script:Sy.C) { $script:Sy.R="cannot load SDK file: ${file}: $($script:Sy.R)"; return }
     }
@@ -248,7 +248,7 @@ function Start-Sycol([string[]]$Arguments) {
 $syLoadPreference=$ErrorActionPreference
 try {
     $ErrorActionPreference='Stop'
-    foreach ($syNativeFile in @(Get-SyLibraryFiles "$script:SyHome/lib/native" '.ps1')) {
+    foreach ($syNativeFile in @(Get-SyLibraryFiles "$script:SyHome/../native" '.ps1')) {
         try { . $syNativeFile } catch { throw "cannot load native file: ${syNativeFile}: $($_.Exception.Message)" }
     }
 } finally {
