@@ -11,6 +11,7 @@ try {
     [void][IO.Directory]::CreateDirectory("$temp/.sycol/sdk/nested")
     [void][IO.Directory]::CreateDirectory("$temp/.sycol/bin")
     Copy-Item -LiteralPath "$root/.sycol/bin/sycol.ps1" -Destination "$temp/.sycol/bin/sycol.ps1"
+    Copy-Item -LiteralPath "$root/.sycol/VERSION" -Destination "$temp/.sycol/VERSION"
     Copy-Item -LiteralPath "$root/.sycol/native/core.ps1" -Destination "$temp/.sycol/native/builtins.ps1"
     Copy-Item -Path "$root/.sycol/sdk/*.tcl" -Destination "$temp/.sycol/sdk"
     Copy-Item -LiteralPath "$root/tests/discovery.tcl" -Destination "$temp/test.tcl"

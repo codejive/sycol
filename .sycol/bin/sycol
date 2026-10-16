@@ -264,8 +264,24 @@ load_sdk() {
         if ((C)); then R="cannot load SDK file: $file: $R"; return; fi
     done
 }
+load_version() {
+    local version
+    if [[ ! -f $SYCOL_HOME/../VERSION || ! -r $SYCOL_HOME/../VERSION ]]; then
+        fail 'cannot read version file'; return
+    fi
+    version=$(< "$SYCOL_HOME/../VERSION")
+    version=${version%$'\r'}
+    if [[ ! $version =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then fail 'invalid version file'; return; fi
+    R=$version; C=0
+}
 main() {
-    if (($#<1)); then printf 'usage: sycol script.tcl [args ...]\n' >&2; return 2; fi
+    if (($#<1)) || [[ $1 == --version && $# != 1 ]]; then
+        printf 'usage: sycol script.tcl [args ...] | sycol --version\n' >&2; return 2
+    fi
+    load_version
+    if ((C)); then printf 'sycol: %s (completion %s)\n' "$R" "$C" >&2; return 1; fi
+    if [[ $1 == --version ]]; then printf '%s\n' "$R"; return 0; fi
+    vset ::sycol_version "$R"
     local script=$1; shift
     quote_list "$@"; vset argv "$R"; vset argc "$#"; vset argv0 "$script"; vset sycol_host bash
     load_sdk

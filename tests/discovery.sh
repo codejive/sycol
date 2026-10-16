@@ -8,13 +8,14 @@ cleanup() {
     rm -f -- "$temp"/.sycol/native/nested/* "$temp"/.sycol/sdk/nested/*
     rmdir -- "$temp/.sycol/native/nested" "$temp/.sycol/sdk/nested"
     rm -f -- "$temp"/.sycol/native/* "$temp"/.sycol/sdk/* "$temp/.sycol/native/.hidden.sh" "$temp/.sycol/sdk/.hidden.tcl" "$temp/sycol" "$temp/test.tcl" "$temp/empty.tcl" "$temp/output"
-    rm -f -- "$temp/.sycol/bin/sycol"
+    rm -f -- "$temp/.sycol/bin/sycol" "$temp/.sycol/VERSION"
     rmdir -- "$temp/.sycol/native" "$temp/.sycol/sdk" "$temp/.sycol/bin" "$temp/.sycol" "$temp"
 }
 trap cleanup EXIT
 mkdir -p "$temp/.sycol/native/nested" "$temp/.sycol/sdk/nested" "$temp/.sycol/bin"
 cp sycol "$temp/sycol"
 cp .sycol/bin/sycol "$temp/.sycol/bin/sycol"
+cp .sycol/VERSION "$temp/.sycol/VERSION"
 # No hard-coded core filename, including for native discovery.
 cp .sycol/native/core.sh "$temp/.sycol/native/builtins.sh"
 cp .sycol/sdk/*.tcl "$temp/.sycol/sdk/"

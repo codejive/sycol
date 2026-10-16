@@ -233,7 +233,19 @@ function Import-SySdk {
 }
 function Start-Sycol([string[]]$Arguments) {
     $ErrorActionPreference='Stop'
-    if (!$Arguments.Count) { [Console]::Error.WriteLine('usage: powershell -File sycol.ps1 script.tcl [args ...]'); return 2 }
+    if (!$Arguments.Count -or ($Arguments[0] -ceq '--version' -and $Arguments.Count -ne 1)) {
+        [Console]::Error.WriteLine('usage: sycol script.tcl [args ...] | sycol --version'); return 2
+    }
+    try {
+        $version=[IO.File]::ReadAllText("$script:SyHome/../VERSION").TrimEnd([char[]]"`r`n")
+    } catch {
+        [Console]::Error.WriteLine('sycol: cannot read version file (completion 1)'); return 1
+    }
+    if ($version -cnotmatch '\A[0-9][0-9A-Za-z.+-]*\z') {
+        [Console]::Error.WriteLine('sycol: invalid version file (completion 1)'); return 1
+    }
+    if ($Arguments[0] -ceq '--version') { [Console]::WriteLine($version); return 0 }
+    Set-SyVariable ::sycol_version $version
     $file=$Arguments[0]; $rest=@(); if ($Arguments.Count -gt 1) { $rest=$Arguments[1..($Arguments.Count-1)] }
     ConvertTo-SyList $rest; Set-SyVariable argv $script:Sy.R; Set-SyVariable argc ([string]$rest.Count)
     Set-SyVariable argv0 $file; Set-SyVariable sycol_host powershell

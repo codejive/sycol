@@ -13,6 +13,9 @@ proc test {name body expected {expectedCode 0}} {
     }
 }
 
+test release-version { eq $::sycol_version [string range [readfile .sycol/VERSION] 0 [- [string length $::sycol_version] 1]] } 1
+proc release-version-from-procedure {} { return $::sycol_version }
+test release-version-global { release-version-from-procedure } $sycol_version
 test empty { eval {} } {}
 test last-result { set x one; set x two } two
 test separators { eval "set x 1\n;set x 2\r\nset x 3" } 3

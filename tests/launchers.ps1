@@ -30,6 +30,27 @@ function Invoke-CmdProbe([string]$Launcher, [string]$Tail, [string[]]$ExpectedAr
     Assert-Output "$Launcher /v:$Delayed" $output $errorText $process.ExitCode $ExpectedArgs
     $process.Dispose()
 }
+function Assert-Release([string]$Launcher, [string[]]$Query, [int]$Status, [string]$Expected, [string]$ExpectedError='') {
+    $literalArgs=($Query | ForEach-Object { "'"+$_.Replace("'","''")+"'" }) -join ','
+    $runner='$probeArgs=@('+$literalArgs+"); & '"+$Launcher.Replace("'","''")+"' @probeArgs; exit `$LASTEXITCODE"
+    [IO.File]::WriteAllText("$temp/runner.ps1",$runner)
+    $start=New-Object Diagnostics.ProcessStartInfo
+    $start.FileName=(Get-Process -Id $PID).Path
+    $start.UseShellExecute=$false
+    $start.WorkingDirectory="$temp/work"
+    $start.RedirectStandardOutput=$true
+    $start.RedirectStandardError=$true
+    $start.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$temp+'/runner.ps1"'
+    $process=[Diagnostics.Process]::Start($start)
+    $output=$process.StandardOutput.ReadToEnd().Replace("`r`n","`n")
+    $errorText=$process.StandardError.ReadToEnd().Replace("`r`n","`n")
+    $process.WaitForExit()
+    try {
+        if ($process.ExitCode -ne $Status -or $output -cne $Expected -or $errorText -cne $ExpectedError) {
+            throw "Release probe failed: $Launcher (exit $($process.ExitCode)): stdout=<$output> stderr=<$errorText>"
+        }
+    } finally { $process.Dispose() }
+}
 try {
     [void][IO.Directory]::CreateDirectory("$temp/.sycol/bin")
     [void][IO.Directory]::CreateDirectory("$temp/.sycol/native")
@@ -37,13 +58,14 @@ try {
     [void][IO.Directory]::CreateDirectory("$temp/work")
     Copy-Item -LiteralPath "$root/sycol.bat" -Destination "$temp/sycol.bat"
     Copy-Item -Path "$root/.sycol/bin/*" -Destination "$temp/.sycol/bin"
+    Copy-Item -LiteralPath "$root/.sycol/VERSION" -Destination "$temp/.sycol/VERSION"
     Copy-Item -Path "$root/.sycol/native/*" -Destination "$temp/.sycol/native"
     Copy-Item -Path "$root/.sycol/sdk/*" -Destination "$temp/.sycol/sdk"
     Copy-Item -LiteralPath "$root/tests/fixtures/argv.tcl" -Destination "$temp/work/argument probe.tcl"
     . "$temp/.sycol/bin/sycol.ps1"
     Set-Location -LiteralPath "$temp/work"
     [string[]]$arguments=@('', 'two words', 'say "hello"', 'tail\', 'two words\', 'a&b|c<d>e(f)^g!h', '$literal;[brackets]', '100%')
-    [string[]]$psArguments=@($arguments)+@('say "a&b"', '%SYCOL_LAUNCH_EXPAND%', "line one`nline two")
+    [string[]]$psArguments=@($arguments)+@('say "a&b"', '%SYCOL_LAUNCH_EXPAND%', "line one`nline two", '--version')
     # Direct PowerShell invocation bypasses the CMD parser, including on PATH.
     $psLaunchers=@("$temp/.sycol/bin/sycol.ps1", 'sycol.ps1')
     if ($env:OS -eq 'Windows_NT') { $psLaunchers+= 'sycol' }
@@ -94,7 +116,25 @@ try {
             }
         }
     }
-    Write-Output 'launcher argument and exit status tests passed'
+    # Changing one file updates both query interfaces in a relocated installation.
+    [IO.File]::WriteAllText("$temp/.sycol/VERSION","9.8.7-test+build`r`n")
+    [IO.File]::WriteAllText("$temp/work/version.tcl",'puts $::sycol_version')
+    $releaseLaunchers=@("$temp/.sycol/bin/sycol.ps1")
+    if ($env:OS -eq 'Windows_NT') { $releaseLaunchers+=@("$temp/sycol.bat","$temp/.sycol/bin/sycol.bat") }
+    foreach ($launcher in $releaseLaunchers) {
+        Assert-Release $launcher @('--version') 0 "9.8.7-test+build`n"
+        Assert-Release $launcher @('version.tcl') 0 "9.8.7-test+build`n"
+        Assert-Release $launcher @('--version','extra') 2 '' "usage: sycol script.tcl [args ...] | sycol --version`n"
+    }
+    [IO.File]::WriteAllText("$temp/.sycol/sdk/0-broken.tcl",'error version-must-not-load-sdk')
+    Assert-Release $releaseLaunchers[0] @('--version') 0 "9.8.7-test+build`n"
+    foreach ($value in @('', 'invalid version')) {
+        [IO.File]::WriteAllText("$temp/.sycol/VERSION",$value)
+        Assert-Release $releaseLaunchers[0] @('--version') 1 '' "sycol: invalid version file (completion 1)`n"
+    }
+    [IO.File]::Delete("$temp/.sycol/VERSION")
+    Assert-Release $releaseLaunchers[0] @('--version') 1 '' "sycol: cannot read version file (completion 1)`n"
+    Write-Output 'launcher argument, version, and exit status tests passed'
 } finally {
     Set-Location -LiteralPath $original.ProviderPath
     $env:PATH=$oldPath

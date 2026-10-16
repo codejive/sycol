@@ -30,6 +30,7 @@ The files shipped together are:
 | `.sycol/bin/sycol` | Executable Bash parser, evaluator, native registry, file launcher |
 | `.sycol/bin/sycol.ps1` | PowerShell implementation of the same contract |
 | `.sycol/bin/sycol.bat` | CMD launcher for the adjacent PowerShell implementation |
+| `.sycol/VERSION` | Single source for the Sycol project/release version |
 | `.sycol/native/core.sh`, `.sycol/native/core.ps1` | Registered built-in native handlers |
 | `.sycol/sdk/*.tcl` | Shared SDK procedures, grouped by responsibility |
 | `tests/all.tcl` | Shared language and SDK conformance tests |
@@ -44,6 +45,7 @@ these are not interpreter runtime dependencies.
 
 ```
 sycol SCRIPT [ARG ...]
+sycol --version
 powershell -NoProfile -File .sycol/bin/sycol.ps1 SCRIPT [ARG ...]
 pwsh -NoProfile -File .sycol/bin/sycol.ps1 SCRIPT [ARG ...]
 sycol.bat SCRIPT [ARG ...]
@@ -76,8 +78,12 @@ string forwarding through `.bat` is not guaranteed. Direct PowerShell `.ps1`
 invocation bypasses CMD and preserves its string arguments, including empty
 strings and embedded quotes.
 
-There are no launcher options. The first argument is always a filename. Missing
-that argument prints usage to stderr and exits 2. Sourcing the interpreter
+The sole launcher option is `--version`: as the only argument, it prints the
+release version followed by a newline and exits 0 without loading the SDK or a
+script. Extra arguments after this option print usage to stderr and exit 2.
+Otherwise the first argument is a filename; use `./--version` for a script
+literally named `--version`. Arguments after a script filename remain literal.
+Missing the first argument prints usage to stderr and exits 2. Sourcing the interpreter
 registers native handlers from `.sycol/native/`. Startup initializes global
 variables, sources the SDK files in `.sycol/sdk/`, then sources the requested
 script in the global frame. Library paths resolve relative to the interpreter
@@ -91,6 +97,18 @@ The final script value is not printed automatically. `puts` produces output.
 | `argc` | Number of remaining arguments, in decimal |
 | `argv` | Proper list of remaining arguments, preserving word boundaries |
 | `sycol_host` | `bash` or `powershell` |
+| `sycol_version` | Release version read from the installation's `.sycol/VERSION` |
+
+Maintain the project/release version by editing `.sycol/VERSION` (initially
+`0.1.0`), including it in every distribution. It contains a single ASCII token
+starting with a digit and using only letters, digits, `.`, `+`, and `-`, with
+an optional LF or CRLF terminator. Both query interfaces read that same file
+relative to the interpreter, independently of the working directory. A missing,
+unreadable, empty, or invalid version file fails startup or `--version` with
+exit 1 and a diagnostic on stderr. The release version is separate from this
+document's specification version. Tcl code can read `$::sycol_version` from any
+procedure; like other startup globals, it is an ordinary mutable variable.
+Embedding by sourcing alone does not initialize it; `main`/`Start-Sycol` does.
 
 Successful completion exits 0. An uncaught error or unresolved return, break,
 or continue exits 1 with `sycol: VALUE (completion CODE)` on stderr. A normal

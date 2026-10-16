@@ -51,12 +51,19 @@ and CMD selects `sycol.bat`. PowerShell users can specify `sycol.ps1` explicitly
 to bypass CMD argument parsing. The root `sycol` and `sycol.bat` wrappers
 provide project-local invocation without changing `PATH`.
 
+Query the Sycol release with `./sycol --version`, `sycol.bat --version`, or
+`& ./.sycol/bin/sycol.ps1 --version`. Each prints just the version and a newline.
+Inside a Tcl script or procedure, use `puts $::sycol_version`.
+Maintain the release by editing the single `.sycol/VERSION` file, initially
+`0.1.0`; keep it with the distribution when copying Sycol into another project.
+
 Copy the two root wrappers and the entire `.sycol/` directory into your project:
 
 ```text
 sycol
 sycol.bat
 .sycol/
+  VERSION
   bin/
     sycol
     sycol.ps1
