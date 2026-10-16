@@ -139,7 +139,12 @@ sy_cmd_list_index() {
     if { [[ $cmd == llength ]] && (($#!=1)); } || { [[ $cmd == lindex ]] && (($#!=2)); }; then arity "$cmd list ?index?"; return; fi
     parse_list "$1"; ((C)) && return
     if [[ $cmd == llength ]]; then R=${#ITEMS[@]}
-    else integer "$2"; ((C)) && return; i=$R; if ((i<0 || i>=${#ITEMS[@]})); then R=; else R=${ITEMS[i]}; fi; fi
+    else
+        if [[ $2 =~ ^[+-]?[0-9]+$ ]]; then integer "$2"
+        else dispatch sy.list.index "$2" "${#ITEMS[@]}"; fi
+        ((C)) && return; i=$R
+        if ((i<0 || i>=${#ITEMS[@]})); then R=; else R=${ITEMS[i]}; fi
+    fi
 }
 sy_cmd_llength() { sy_cmd_list_index 'llength' "$@"; }
 sy_register 'llength' sy_cmd_llength

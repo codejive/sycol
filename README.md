@@ -26,10 +26,10 @@ puts [exec git --version]
 Capture a process's status, stdout, and stderr as a three-element list:
 
 ```tcl
-set result [exec -capture -- git status --short]
-puts "status: [lindex $result 0]"
-puts -nonewline [lindex $result 1]
-puts -nonewline [lindex $result 2]
+lassign [exec -capture -- git status --short] status stdout stderr
+puts "status: $status"
+puts -nonewline $stdout
+puts -nonewline $stderr
 ```
 
 `-capture` returns normally even for a nonzero child exit and preserves all
@@ -37,6 +37,21 @@ trailing newlines in both streams. Launch and capture failures remain errors.
 Plain `exec` streams stderr, raises an error on nonzero exit, and removes one
 final newline from stdout. Bash capture requires `mktemp`, `cat`, `rm`, and
 `rmdir`; it stores output in private temporary files while the child runs.
+
+Lists support assignment, slicing, insertion, replacement, and reversal:
+
+```tcl
+set items {a b c d}
+puts [lindex $items end]          ;# d
+puts [lrange $items 1 end-1]      ;# b c
+set items [linsert $items end e]  ;# a b c d e
+set items [lreplace $items 1 2 x] ;# a x d e
+puts [lreverse $items]           ;# e d x a
+```
+
+`lassign` sets missing values to empty strings and returns any unassigned
+elements. List indices accept decimal integers, `end`, `end-N`, `end+N`,
+and a single decimal addition or subtraction such as `1+2`.
 
 List, inspect, copy, and delete filesystem entries using literal paths:
 

@@ -131,7 +131,9 @@ function Invoke-SyNativeListIndex([string]$cmd, [string[]]$a) {
     $items=ConvertFrom-SyList $a[0]; if ($script:Sy.C) { return }
     if ($cmd -ceq 'llength') { $script:Sy.R=[string]$items.Count }
     else {
-        Convert-SyInteger $a[1]; if ($script:Sy.C) { return }; $index=[int]$script:Sy.R; $script:Sy.R=''
+        if ($a[1] -cmatch '^[+-]?[0-9]+$') { Convert-SyInteger $a[1] }
+        else { Invoke-SyCommand @('sy.list.index',$a[1],[string]$items.Count) }
+        if ($script:Sy.C) { return }; $index=[int]$script:Sy.R; $script:Sy.R=''
         if ($index -ge 0 -and $index -lt $items.Count) { $script:Sy.R=$items[$index] }
     }
 }

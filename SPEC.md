@@ -278,7 +278,7 @@ do not return a meaningful value return the empty string.
 | `while testScript body` | Reevaluate a script condition before every iteration |
 | `list ?value ...?` | Encode values into a reversible list |
 | `llength list` | Parse and count list elements |
-| `lindex list index` | Nonnegative decimal index; negative/out-of-range returns empty |
+| `lindex list index` | One list index (see below); negative/out-of-range returns empty |
 | `string length value` | Return string length in host character units |
 | `string equal a b` | Exact case-sensitive equality; return 0 or 1 |
 | `string range value first last` | Inclusive decimal bounds, clamped to the string; empty if disjoint |
@@ -331,6 +331,17 @@ whitespace and script-special characters. `lindex` returns decoded values.
 Canonical encoding is identical on both hosts. General Tcl scripts may use
 other equivalent encodings; compare decoded elements when representation is
 not relevant.
+
+List indices accept signed decimal integers, `end` (also `e` or `en`),
+`end+N`, `end-N`, `M+N`, and `M-N`, with signed decimal integer operands.
+There is no whitespace, substitution, or chained arithmetic inside an index.
+Operands and resolved results obey the usual signed 32-bit limits and decimal
+rules; overflow is an error. This is index notation, not an expression parser.
+`end` resolves to length minus one for `lindex`, `lrange`, and `lreplace`.
+For `linsert`, it resolves to length, so `end` appends and `end-1` inserts
+before the final element. `lindex` still accepts exactly one index; Tcl's
+nested index lists and zero/multiple-index forms are not implemented.
+`string range` retains its decimal-only bounds.
 
 There is no `{*}` word expansion. Use `apply command argumentList` from the SDK.
 Never construct executable scripts by concatenating unquoted untrusted strings;
@@ -425,6 +436,11 @@ to add a Tcl procedure.
 | `incr name ?amount?` | Update an existing caller variable by an integer amount (default 1); return new value |
 | `append name ?value ...?` | Concatenate to a caller variable, creating it if absent; return value |
 | `lappend name ?value ...?` | Append list elements to a caller variable, creating it if absent; validate existing list |
+| `lassign list ?varName ...?` | Assign elements to caller variables in order; missing elements become empty; return unassigned elements as a list |
+| `lrange list first last` | Return an inclusive element range; clamp first to zero and last to the final element; disjoint/reversed ranges return empty |
+| `linsert list index ?element ...?` | Return a list with elements inserted before index; clamp to the beginning/end; `end` appends |
+| `lreplace list first last ?element ...?` | Return a list replacing an inclusive range; omitted elements delete; reversed bounds insert before first |
+| `lreverse list` | Return the elements in reverse order |
 | `concat ?list ...?` | Flatten one list level and return a canonical list |
 | `join list ?separator?` | Join decoded elements, default separator one space |
 | `foreach name list body` | Set one caller variable per element and evaluate body there; handle break/continue |
@@ -550,6 +566,20 @@ to stderr. Native filesystem handlers ship in `native/files.sh` and
 These existing operations follow Tcl's `file` API within the limits above;
 other Tcl file subcommands are not implemented. `file list` remains a Sycol
 extension without introducing Tcl's globbing interface.
+
+### List procedures
+
+The list editing procedures validate their input list even for empty ranges or
+no inserted elements. `lreplace` clamps a negative first index to zero and a
+first index beyond the list to its length. A last index before first deletes
+nothing; a last index beyond the list deletes through its end. Thus ranges
+entirely before/after the list prepend/append the replacement elements.
+These procedures return new lists without changing their input variables.
+`lassign` validates its list before assigning, but assignments are sequential:
+an invalid variable name can leave earlier assignments in place. Names follow
+the existing variable rules (including `::` globals), without Tcl array support.
+The internal shared helper `sy.list.index index length` resolves index notation;
+native `lindex` uses it for non-integer indices after SDK loading.
 
 ### Control procedures
 

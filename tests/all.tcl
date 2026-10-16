@@ -201,6 +201,7 @@ test arity-errors {
 } 24
 
 source tests/parser.tcl
+source tests/lists.tcl
 source tests/files.tcl
 source tests/paths.tcl
 
