@@ -236,6 +236,18 @@ Register-SyNative 'exec' {
     Invoke-SyProcess $a
 }
 
+Register-SyNative 'exit' {
+    param([string[]]$a)
+    if ($a.Count -gt 1) { Set-SyArity 'exit ?status?'; return }
+    $status='0'
+    if ($a.Count) { $status=$a[0] }
+    Convert-SyInteger $status
+    if ($script:Sy.C) { return }
+    $status=[int]$script:Sy.R
+    if ($status -lt 0 -or $status -gt 255) { Set-SyError 'exit status must be 0..255'; return }
+    [Environment]::Exit($status)
+}
+
 # Windows PowerShell lacks ProcessStartInfo.ArgumentList. Quote each argument by
 # the Windows CRT convention, including empty strings and final backslashes.
 function ConvertTo-SyWindowsArgument([string]$Value) {

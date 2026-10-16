@@ -118,7 +118,12 @@ Embedding by sourcing alone does not initialize it; `main`/`Start-Sycol` does.
 Successful completion exits 0. An uncaught error or unresolved return, break,
 or continue exits 1 with `sycol: VALUE (completion CODE)` on stderr. A normal
 top-level `return` ends the script successfully through the `source` boundary.
-There is no REPL, stdin script mode, `-c`, or language-level `exit` command.
+`exit ?status?` immediately terminates the host process, defaulting to 0.
+The status must be a decimal integer in 0..255 for portable shell behavior.
+Invalid arguments are catchable errors. A valid `exit` is not a completion code:
+it cannot be intercepted by `catch`, procedures, or `source`, and prints no
+diagnostic. Embedded applications must account for it terminating their host.
+There is no REPL, stdin script mode, or `-c` mode.
 
 All relative file paths, including nested `source` paths, resolve against the
 current working directory. Sourcing a file does not change that directory.
@@ -199,7 +204,7 @@ Dispatch checks script procedures, then registered native handlers. Built-in
 primitives use the same registry as native extensions. Script definitions may
 override built-ins and SDK procedures. There is no implicit `unknown` handler
 or OS command fallback.
-There is no command deletion, rename operation, or introspection subsystem.
+There is no command deletion, command-renaming operation, or introspection subsystem.
 
 ## 5. Completion semantics
 
@@ -288,6 +293,8 @@ do not return a meaningful value return the empty string.
 | `cd path` | Change the host's working directory |
 | `getenv name` | Read a process environment variable; absent is empty |
 | `exec program ?arg ...?` | Execute one external program, detailed below |
+| `exit ?status?` | Immediately terminate the process with status 0..255; default 0 |
+| `sy.file operation arguments...` | Host filesystem primitive used by the shared `file` procedure, detailed below |
 
 ### Conditions and arithmetic
 
@@ -381,7 +388,7 @@ export environment variables.
 ## 7. Shared Tcl SDK
 
 The launcher loads the SDK from all direct `.tcl` files in `.sycol/sdk/` before
-the requested script. The shipped files are `control.tcl`, `lists.tcl`,
+the requested script. The shipped files are `control.tcl`, `files.tcl`, `lists.tcl`, `paths.tcl`,
 `strings.tcl`, and `variables.tcl`. Applications extend it by defining
 procedures or sourcing additional files. No host dispatcher change is needed
 to add a Tcl procedure.
@@ -399,6 +406,118 @@ to add a Tcl procedure.
 | `and leftScript rightScript` | Lazy logical conjunction in caller frame, returning 0 or 1 |
 | `or leftScript rightScript` | Lazy logical disjunction in caller frame, returning 0 or 1 |
 | `apply command arguments` | Invoke one named command with elements of a list as its arguments, in caller frame |
+| `file list ?path?` | List immediate entry names, including hidden entries; default `.`; exclude `.` and `..`; order unspecified |
+| `file type path` | Return Tcl's file type name: `file`, `directory`, `link`, `characterSpecial`, `blockSpecial`, `fifo`, or `socket`; missing paths are errors |
+| `file delete ?-force? ?--? ?path ...?` | Delete entries in order; missing paths succeed; nonempty directories require `-force`; read-only files can be removed without `-force` |
+| `file copy ?-force? ?--? source ?source ...? target` | Recursively copy entries, preserving supported attributes; existing directory targets receive sources under their basenames; replacement requires `-force` |
+| `file rename ?-force? ?--? source ?source ...? target` | Move entries in order; directory targets receive sources under their basenames; existing entries require `-force`; cross-filesystem moves use copy/delete when needed |
+| `file mkdir ?path ...?` | Create directories and missing parents; existing directories succeed; stop at the first error |
+| `file exists path`, `file isfile path`, `file isdirectory path` | Return 0 or 1, following links; missing or inaccessible paths return 0 |
+| `file size path` | Return byte length as a decimal string, following links; missing paths fail |
+| `file join name ?name ...?` | Join path components using Tcl's host path rules and `/` separators; a rooted or leading-home component resets earlier components |
+| `file dirname path`, `file tail path` | Return the parent or final component using host path rules, ignoring trailing separators |
+| `file extension path`, `file rootname path` | Return the final extension (including its dot), or the original path with that extension removed |
+
+### Filesystem operations
+
+Paths have no wildcard, environment expansion, or implicit shell evaluation.
+For filesystem operations, `~` and `~/...` expand to the current user's home,
+using HOME, then USERPROFILE where applicable, or the host's home-directory API.
+Named-user `~user` lookup is not supported: it would require additional account
+lookup mechanisms across the supported hosts. Pass an explicit path instead.
+The `file list` extension is unchanged: it takes a literal directory path,
+returns names as a proper list, includes hidden entries, follows a link to the
+directory, and returns an empty list for an empty directory.
+
+Copy, rename, and delete accept only `-force` and `--`, preceding paths. Repeated `-force`
+is allowed. Use `--` before a path beginning with `-`. Unknown options and wrong
+argument counts are errors. `-recursive` and `-attributes` are not supported;
+recursion and metadata preservation follow Tcl's defaults instead. Deleting
+zero paths or an empty path succeeds. An empty source or target for copy is an
+error. Tcl-compatible subcommand abbreviations start with `co`, `de`, `ty`,
+`mk`, `exi`, `isf`, `isd`, `j`, `di`, `ta`, `ext`, `ro`, `si`, and `ren` for the
+supported operations. Ambiguous prefixes such as `c`, `d`, and `t` fail.
+`file type` examines the entry itself, including dangling links. Trailing
+directory separators are ignored when identifying the final entry.
+
+Delete and copy operate on the final link itself, including links encountered
+inside recursive trees, rather than traversing its target. Copying symbolic
+links requires host link-creation support and permissions; unsupported link
+types or creation failures are errors. If the copy target is an existing
+directory (including a link to a directory), each source is copied inside it
+under its basename. Otherwise exactly one source is required and the target
+is its new path. Target parents must already exist. Existing entries require
+`-force`; directory trees are never merged, even when the existing destination
+tree is empty. A directory cannot replace a file or link, and a file or link
+cannot replace a directory. `-force` can replace a final symbolic link without
+changing its referent. Paths are processed in argument order, stopping on the
+first error without rolling back earlier changes. Missing delete paths are
+ignored, with or without `-force`. Force deletion attempts to adjust permissions
+and move cwd outside the deleted tree when necessary.
+
+Copying a file onto itself or a directory into its descendant fails. Tcl's
+same-file handling varies by host; Sycol consistently rejects it. Operations
+are not transactional: failures may leave a partially copied or deleted tree.
+
+Copy preserves modification/access timestamps and native file attributes by
+default. Bash uses `cp -p` (including Unix permissions); PowerShell preserves
+.NET file attributes and Unix permission bits where applicable. Metadata outside the host's native
+support, ACLs, ownership, and cross-platform permission translation are not
+portable guarantees. Native filesystems are supported; Tcl virtual filesystems
+and portable copying of special filesystem objects are outside this subset.
+Use a native extension for operations requiring those facilities.
+
+Rename first attempts a native move. Across filesystems it falls back to copying
+and then deleting the source, matching Tcl's approach. The source is removed
+only after the copy completes successfully. Such a move is not atomic: a copy
+failure may leave a partial destination, and a source-deletion failure leaves
+both copies and reports an error. `-force` can replace an empty destination
+directory with a directory, but cannot merge a nonempty destination tree or
+replace a directory with a file (or vice versa). A forced rename onto the same
+entry succeeds without changing it. Argument order and stop-on-error behavior
+are the same as copy. Windows volume changes are handled by the existing
+copy/delete helpers; Bash uses the standard `mv` utility's fallback. Native
+cross-device errors on the same path root also enable the PowerShell fallback.
+
+Predicates follow links: a dangling link has type `link` but `exists`, `isfile`,
+and `isdirectory` return 0. `mkdir` accepts literal arguments, not option
+switches; zero arguments succeeds, but an empty pathname is an error. File
+size is measured in bytes, independently of text encoding or Sycol string
+length. Size results can exceed the arithmetic core's signed 32-bit range;
+such values remain valid strings. Directory sizes are host-dependent (0 on
+Windows PowerShell); use size primarily for regular files.
+
+Path helpers live in the shared `paths.tcl` SDK and do not access the filesystem,
+except that dirname/tail expand a bare home name such as `~`, as Tcl 8.6 does.
+They do not resolve `.` or `..` or symbolic links. Unix recognizes `/`; Windows
+also recognizes backslashes, drive-relative paths such as `C:foo`, drive roots,
+and UNC share roots. Joins collapse repeated separators and discard trailing
+separators except roots and bare home prefixes; other dot components remain.
+Tail prefixes a literal leading tilde with `./` to distinguish it from a home
+name. Extension/rootname operate on the original path: dotfiles have an
+extension, and a trailing separator means there is no extension. Rootname
+preserves the original separators. Other than bare-home dirname/tail handling,
+these helpers need not refer to an existing entry.
+
+The native primitive accepts `sy.file windows`, `sy.file expand path`,
+`sy.file list path`, `sy.file type path`, `sy.file exists path`,
+`sy.file isfile path`, `sy.file isdirectory path`, `sy.file mkdir path`,
+`sy.file size path`, `sy.file delete path force`, and
+`sy.file copy|rename source target force intoDirectory`; flag values are `0`
+or `1`. Applications should use the SDK `file` interface. Bash filesystem
+mutation requires the standard `cp`, `mv`, `mkdir`, `rm`, `rmdir`, and `chmod`
+utilities on PATH; size uses GNU or BSD `stat`. Listing and type checks use shell built-ins. PowerShell uses filesystem APIs;
+on Unix it also uses standard `stat` (GNU or BSD syntax) and `chmod` utilities
+to support file types and permission preservation on older supported .NET versions.
+Host I/O failures become catchable errors; host tools may also write diagnostics
+to stderr. Native filesystem handlers ship in `native/files.sh` and
+`native/files.ps1` alongside the existing core handlers.
+
+These existing operations follow Tcl's `file` API within the limits above;
+other Tcl file subcommands are not implemented. `file list` remains a Sycol
+extension without introducing Tcl's globbing interface.
+
+### Control procedures
 
 `foreach` and `for` return empty on normal termination. Loop variables persist
 in the caller. `foreach` supports one variable and one list, not Tcl's multiple

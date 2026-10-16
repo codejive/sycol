@@ -122,6 +122,10 @@ try {
     $releaseLaunchers=@("$temp/.sycol/bin/sycol.ps1")
     if ($env:OS -eq 'Windows_NT') { $releaseLaunchers+=@("$temp/sycol.bat","$temp/.sycol/bin/sycol.bat") }
     foreach ($launcher in $releaseLaunchers) {
+        foreach ($case in @(@('exit',0), @('proc stop {} { exit 37 }; catch {stop}; error unreachable',37), @('exit 255',255))) {
+            [IO.File]::WriteAllText("$temp/work/exit.tcl",$case[0])
+            Assert-Release $launcher @('exit.tcl') $case[1] ''
+        }
         Assert-Release $launcher @('--version') 0 "9.8.7-test+build`n"
         Assert-Release $launcher @('version.tcl') 0 "9.8.7-test+build`n"
         Assert-Release $launcher @('--version','extra') 2 '' "usage: sycol script.tcl [args ...] | sycol --version`n"

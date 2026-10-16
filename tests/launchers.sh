@@ -28,6 +28,18 @@ for launcher in "$temp/install with spaces/sycol" "$root/.sycol/bin/sycol"; do
     if "$engine" "$launcher" > "$temp/actual" 2>&1; then exit 1; else [[ $? == 2 ]]; fi
     if "$engine" "$launcher" missing.tcl > "$temp/actual" 2>&1; then exit 1; else [[ $? == 1 ]]; fi
 done
+# exit terminates through catch, procedures, and source, without diagnostics.
+for body in 'exit' 'proc stop {} { exit 37 }; catch {stop}; error unreachable' 'exit 255'; do
+    printf '%s\n' "$body" > "$temp/version.tcl"
+    expected=0
+    [[ $body == *37* ]] && expected=37
+    [[ $body == *255* ]] && expected=255
+    for launcher in "$temp/install with spaces/sycol" "$root/.sycol/bin/sycol"; do
+        status=0
+        "$engine" "$launcher" "$temp/version.tcl" > "$temp/actual" 2>&1 || status=$?
+        [[ $status == "$expected" && ! -s $temp/actual ]]
+    done
+done
 # A copied distribution owns its release version, independent of cwd or SDK.
 printf '%s\n' '9.8.7-test+build' > "$temp/install with spaces/.sycol/VERSION"
 printf '%s\n' 'puts $::sycol_version' > "$temp/version.tcl"

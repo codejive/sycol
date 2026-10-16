@@ -23,6 +23,31 @@ puts "total: $total"
 puts [exec git --version]
 ```
 
+List, inspect, copy, and delete filesystem entries using literal paths:
+
+```tcl
+foreach name [file list .] { puts "$name: [file type $name]" }
+set output [file join build backup]
+file mkdir [file dirname $output]
+file copy source-dir backup-dir
+file rename backup-dir $output
+if [file isfile [file join $output notes.txt]] {
+    puts "notes: [file size [file join $output notes.txt]] bytes"
+}
+file delete -force $output
+exit 0
+```
+
+Copying directories is recursive and preserves supported attributes by default.
+An existing target directory receives each source under its basename; overwriting
+an existing file requires `-force`. Copy, rename, and delete accept multiple paths.
+Rename supports cross-filesystem moves by copying and then deleting the source
+after a successful copy; these moves are not atomic.
+Deleting a missing path succeeds; deleting a nonempty directory needs `-force`.
+`exit` defaults to 0, accepts statuses 0–255, and terminates immediately even
+inside `catch`. Bash uses standard `cp`, `mv`, `mkdir`, `rm`, `rmdir`, `chmod`, and `stat` utilities;
+PowerShell on Unix also uses `stat` and `chmod` for file types and permissions.
+
 Run a file (paths are relative to the current working directory):
 
 ```sh

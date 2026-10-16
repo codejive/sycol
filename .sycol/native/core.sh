@@ -267,3 +267,11 @@ sy_cmd_exec() {
     R=$out
 }
 sy_register 'exec' sy_cmd_exec
+
+sy_cmd_exit() {
+    if (($#>1)); then arity 'exit ?status?'; return; fi
+    integer "${1-0}"; ((C)) && return
+    if ((R<0 || R>255)); then fail 'exit status must be 0..255'; return; fi
+    exit "$R"
+}
+sy_register 'exit' sy_cmd_exit

@@ -179,7 +179,7 @@ test writefile {
 test getenv-missing { getenv SYCOL_TEST_VARIABLE_THAT_IS_UNSET } {}
 test exec-missing { exec sycol_nonexistent_executable_7654321 } {cannot execute: sycol_nonexistent_executable_7654321} 1
 test exec-arity { exec } {wrong # args: exec program ?arg ...?} 1
-test argv-count { llength $::argv } 2
+test argv-count { llength $::argv } 3
 test argv-literal { lindex $::argv 1 } {argument with spaces; $literal [brackets]}
 
 test arity-errors {
@@ -192,6 +192,8 @@ test arity-errors {
 } 24
 
 source tests/parser.tcl
+source tests/files.tcl
+source tests/paths.tcl
 
 puts "$passed tests passed; $failed failed"
 if [> $failed 0] { error "$failed tests failed" }
