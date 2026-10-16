@@ -1,0 +1,37 @@
+name: Tests
+on: [push, pull_request]
+jobs:
+  bash:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash version
+        run: /bin/bash --version
+      - name: Shared Tcl and process tests
+        env:
+          SYCOL_BASH: /bin/bash
+        run: /bin/bash tests/run.sh
+  powershell:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        shell: [powershell, pwsh]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell version
+        run: $PSVersionTable.PSVersion
+      - name: Shared Tcl and process tests
+        run: ./tests/run.ps1
+  powershell-unix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared Tcl and process tests
+        shell: pwsh
+        run: ./tests/run.ps1
