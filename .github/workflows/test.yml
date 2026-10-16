@@ -1,5 +1,13 @@
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version to test in place of the checked-in version
+        type: string
+        default: ''
 jobs:
   bash:
     strategy:
@@ -8,6 +16,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set release version
+        if: inputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: printf '%s\n' "$VERSION" > .sycol/VERSION
       - name: Bash version
         run: /bin/bash --version
       - name: Shared Tcl and process tests
@@ -29,6 +43,12 @@ jobs:
         shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set release version
+        if: inputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: printf '%s\n' "$VERSION" > .sycol/VERSION
       - name: PowerShell version
         run: $PSVersionTable.PSVersion
       - name: Shared Tcl and process tests
@@ -37,6 +57,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set release version
+        if: inputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: printf '%s\n' "$VERSION" > .sycol/VERSION
       - name: Shared Tcl and process tests
         shell: pwsh
         run: ./tests/run.ps1

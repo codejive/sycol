@@ -54,8 +54,10 @@ provide project-local invocation without changing `PATH`.
 Query the Sycol release with `./sycol --version`, `sycol.bat --version`, or
 `& ./.sycol/bin/sycol.ps1 --version`. Each prints just the version and a newline.
 Inside a Tcl script or procedure, use `puts $::sycol_version`.
-Maintain the release by editing the single `.sycol/VERSION` file, initially
-`0.1.0`; keep it with the distribution when copying Sycol into another project.
+The single `.sycol/VERSION` file, initially `0.1.0`, stores the runtime version;
+keep it with the distribution when copying Sycol into another project.
+Maintainers publish releases through the manually triggered GitHub Actions
+workflow, supplying an explicit version. See [the release process](RELEASE.md).
 
 Copy the two root wrappers and the entire `.sycol/` directory into your project:
 

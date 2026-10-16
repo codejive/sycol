@@ -1,1 +1,3 @@
 .test-tmp/
+out/
+jreleaser-cli.jar

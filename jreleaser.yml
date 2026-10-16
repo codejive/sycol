@@ -1,0 +1,48 @@
+project:
+  name: sycol
+  description: A tiny Tcl-like interpreter written in Bash and PowerShell
+  authors:
+    - codejive
+  license: Apache-2.0
+  copyright: '2026 Codejive'
+  links:
+    homepage: https://github.com/codejive/sycol
+  stereotype: CLI
+
+assemble:
+  archive:
+    sycol:
+      active: ALWAYS
+      formats: [ZIP, TGZ]
+      distributionType: BINARY
+      attachPlatform: false
+      fileSets:
+        - input: .sycol
+          output: .sycol
+        - input: .
+          includes:
+            - sycol
+            - sycol.bat
+            - LICENSE
+            - README.md
+            - RELEASE.md
+            - SPEC.md
+        - input: examples
+          output: examples
+
+release:
+  github:
+    owner: codejive
+    name: sycol
+    branch: main
+    tagName: 'v{{projectVersion}}'
+    releaseName: 'Sycol {{projectVersion}}'
+    overwrite: false
+    update:
+      enabled: false
+    changelog:
+      formatted: ALWAYS
+      preset: conventional-commits
+
+checksum:
+  algorithms: [SHA-256]

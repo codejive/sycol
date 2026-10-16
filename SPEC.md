@@ -106,7 +106,12 @@ an optional LF or CRLF terminator. Both query interfaces read that same file
 relative to the interpreter, independently of the working directory. A missing,
 unreadable, empty, or invalid version file fails startup or `--version` with
 exit 1 and a diagnostic on stderr. The release version is separate from this
-document's specification version. Tcl code can read `$::sycol_version` from any
+document's specification version. The manual GitHub Actions release process
+writes the requested stable `MAJOR.MINOR.PATCH` version to this file, tests it,
+and publishes ZIP/TGZ distributions and tag `vVERSION` from the versioned
+commit. This release-input policy does not narrow the runtime's accepted
+version-file format. See [RELEASE.md](RELEASE.md) for the maintainer procedure.
+Tcl code can read `$::sycol_version` from any
 procedure; like other startup globals, it is an ordinary mutable variable.
 Embedding by sourcing alone does not initialize it; `main`/`Start-Sycol` does.
 

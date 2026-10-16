@@ -1,0 +1,106 @@
+name: Release
+run-name: Release ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New release version (MAJOR.MINOR.PATCH, without v)'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate version and branch
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo '::error::Releases must be started from main.'
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::Version must be MAJOR.MINOR.PATCH without a v prefix or leading zeroes.'
+            exit 1
+          fi
+          if git show-ref --verify --quiet "refs/tags/v$VERSION"; then
+            echo '::error::The requested release tag already exists.'
+            exit 1
+          fi
+
+  test:
+    needs: validate
+    uses: ./.github/workflows/test.yml
+    with:
+      version: ${{ inputs.version }}
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set and commit release version
+        run: |
+          printf '%s\n' "$VERSION" > .sycol/VERSION
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .sycol/VERSION
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): $VERSION"
+          fi
+          echo "JRELEASER_PROJECT_VERSION=$(cat .sycol/VERSION)" >> "$GITHUB_ENV"
+      - name: Set up JReleaser and assemble distributions
+        uses: jreleaser/release-action@4501f01eb251548d813b4f9534793e6a2b650bd8 # v1.3.0-java
+        with:
+          version: '1.26.0'
+          arguments: assemble
+      - name: Verify distribution contents and permissions
+        run: bash tests/release.sh "$VERSION"
+      - name: Smoke test the packaged runtime
+        run: |
+          mkdir -p out/smoke
+          tar -xzf "out/jreleaser/assemble/sycol/archive/sycol-$VERSION.tgz" -C out/smoke
+          cd "out/smoke/sycol-$VERSION"
+          test "$(./sycol --version)" = "$VERSION"
+          ./sycol examples/hello.tcl Alice
+          pwsh -NoProfile -File .sycol/bin/sycol.ps1 examples/hello.tcl Alice
+      - name: Dry-run the release
+        run: java -jar jreleaser-cli.jar full-release --dry-run
+      - name: Push the tested release commit
+        run: |
+          remote_head=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          if [[ "$remote_head" != "$GITHUB_SHA" ]]; then
+            echo '::error::main changed during the release. Start a new run from its latest commit.'
+            exit 1
+          fi
+          git push origin HEAD:refs/heads/main
+      - name: Publish release
+        run: java -jar jreleaser-cli.jar full-release
+      - name: Save release diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jreleaser-release-output
+          if-no-files-found: ignore
+          path: |
+            out/jreleaser/trace.log
+            out/jreleaser/output.properties
