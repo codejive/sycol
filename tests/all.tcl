@@ -191,5 +191,7 @@ test arity-errors {
     set count
 } 24
 
+source tests/parser.tcl
+
 puts "$passed tests passed; $failed failed"
 if [> $failed 0] { error "$failed tests failed" }

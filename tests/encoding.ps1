@@ -10,6 +10,12 @@ try {
     $text=$utf8.GetString([byte[]](0xC2,0x80,0xDF,0xBF,0xE0,0xA0,0x80,0xED,0x9F,0xBF,0xEE,0x80,0x80,0xEF,0xBF,0xBF,0xF0,0x90,0x80,0x80,0xF4,0x8F,0xBF,0xBF))
     [IO.File]::WriteAllText("$temp/plain.tcl","return {$text}`r`n",$utf8)
     [IO.File]::WriteAllText("$temp/bom.tcl","return {$text}`r`n",(New-Object Text.UTF8Encoding($true,$true)))
+    [IO.File]::WriteAllText("$temp/empty.tcl",'',$utf8)
+    [IO.File]::WriteAllBytes("$temp/bom-empty.tcl",[byte[]](0xEF,0xBB,0xBF))
+    [IO.File]::WriteAllText("$temp/trailing.tcl","$text`r`n`n`n",$utf8)
+    [IO.File]::WriteAllText("$temp/nul.tcl","set ::encoding_side_effect changed$([char]0)error hidden",$utf8)
+    [IO.File]::WriteAllText("$temp/nul-end.tcl","$text$([char]0)",$utf8)
+    [IO.File]::WriteAllText("$temp/locale.tcl","return [string length {$text}]`n",$utf8)
     & $engine -NoProfile -ExecutionPolicy Bypass -File .sycol/bin/sycol.ps1 tests/encoding.tcl $temp $text
     if ($LASTEXITCODE) { throw 'UTF-8 file suite failed' }
 } finally {

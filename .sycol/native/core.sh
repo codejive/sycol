@@ -209,16 +209,23 @@ sy_cmd_puts() {
 }
 sy_register 'puts' sy_cmd_puts
 
-sy_cmd_read() {
-    local cmd=$1; shift
-    local value
-    if (($#!=1)); then arity "$cmd path"; return; fi
+sy_read_text() {
+    # Byte operations here must not change the locale used by sourced code.
+    local LC_ALL=C value
     if [[ ! -f $1 || ! -r $1 ]]; then fail "cannot read file: $1"; return; fi
     value=
     if IFS= read -r -d '' value < "$1"; then fail "NUL in text file: $1"; return; fi
-    value=${value#$'\357\273\277'}
     # Accept a leading UTF-8 BOM for both source and readfile.
-    if [[ $cmd == source ]]; then value=${value//$'\r\n'/$'\n'}; eval_script "$value"; finish_return; else R=$value; fi
+    # Prefix removal with ${value#pattern} tries successively longer prefixes
+    # even when the BOM is absent. Test three bytes and slice only on a match.
+    if [[ ${value:0:3} == $'\357\273\277' ]]; then value=${value:3}; fi
+    R=$value
+}
+sy_cmd_read() {
+    local cmd=$1; shift
+    if (($#!=1)); then arity "$cmd path"; return; fi
+    sy_read_text "$1"; ((C)) && return
+    if [[ $cmd == source ]]; then R=${R//$'\r\n'/$'\n'}; eval_script "$R"; finish_return; fi
 }
 sy_cmd_source() { sy_cmd_read 'source' "$@"; }
 sy_register 'source' sy_cmd_source

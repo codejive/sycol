@@ -136,5 +136,10 @@ directory for generated files. CI covers macOS `/bin/bash` (the Bash 3.2
 target), current Linux Bash, Windows PowerShell, and PowerShell on Windows and
 Linux. CI configuration is included; running CI requires a hosted repository.
 
+For optional Bash timings (file reading, startup, parsing, and list encoding),
+run `bash tests/benchmark.sh`. To compare another installation, pass its
+interpreter file as the first argument. Timings depend on the host and locale;
+the benchmark is not a pass/fail performance test.
+
 Sycol scripts have the same filesystem and process access as their host shell.
 Run trusted scripts.

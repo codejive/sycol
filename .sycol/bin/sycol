@@ -47,16 +47,20 @@ vset() {
     VK+=("$KEY"); VV+=("$2"); R=$2
 }
 quote_list() {
-    local word ch i out= sep=
+    local word ch i n out= sep= span pattern='^[^][ {}\$";#\\'$'\t\r\n'']+'
     for word in "$@"; do
-        out=$out$sep; sep=' '
-        if [[ -z $word ]]; then out=$out'{}'; continue; fi
-        for ((i=0;i<${#word};i++)); do
+        out+=$sep; sep=' '
+        if [[ -z $word ]]; then out+='{}'; continue; fi
+        n=${#word}
+        for ((i=0;i<n;i++)); do
+            if [[ ${word:i:1024} =~ $pattern ]]; then
+                span=${BASH_REMATCH[0]}; out+=$span; i=$((i+${#span}-1)); continue
+            fi
             ch=${word:i:1}
             case $ch in
-                $'\n') out=$out'\n';; $'\r') out=$out'\r';; $'\t') out=$out'\t';;
-                ' '|\\|'{'|'}'|'['|']'|'$'|'"'|';'|'#') out=$out\\$ch;;
-                *) out=$out$ch;;
+                $'\n') out+='\n';; $'\r') out+='\r';; $'\t') out+='\t';;
+                ' '|\\|'{'|'}'|'['|']'|'$'|'"'|';'|'#') out+=\\$ch;;
+                *) out+=$ch;;
             esac
         done
     done
@@ -67,26 +71,36 @@ quote_list() {
 escape_char() {
     I=$((I+1))
     if ((I >= N)); then fail 'trailing backslash'; return; fi
-    local ch=${S:I:1}; I=$((I+1))
+    local ch=${S:I:1} span blanks='^[ '$'\t'']+'; I=$((I+1))
     case $ch in
         n) R=$'\n';; r) R=$'\r';; t) R=$'\t';;
-        $'\n') while ((I<N)) && [[ ${S:I:1} == ' ' || ${S:I:1} == $'\t' ]]; do I=$((I+1)); done; R=' ';;
+        $'\n')
+            while ((I<N)) && [[ ${S:I:1024} =~ $blanks ]]; do
+                span=${BASH_REMATCH[0]}; I=$((I+${#span}))
+            done
+            R=' ';;
         *) R=$ch;;
     esac
 }
 substitute() {
-    local ch=${S:I:1} start name
+    local ch=${S:I:1} start name span pattern
     case $ch in
         \\) escape_char;;
         '$')
             I=$((I+1)); start=$I
             if [[ ${S:I:1} == '{' ]]; then
                 I=$((I+1)); start=$I
-                while ((I<N)) && [[ ${S:I:1} != '}' ]]; do I=$((I+1)); done
+                pattern='^[^}]+'
+                while ((I<N)) && [[ ${S:I:1024} =~ $pattern ]]; do
+                    span=${BASH_REMATCH[0]}; I=$((I+${#span}))
+                done
                 if ((I==N)); then fail 'missing variable close brace'; return; fi
                 name=${S:start:I-start}; I=$((I+1))
             else
-                while ((I<N)) && [[ ${S:I:1} == [a-zA-Z0-9_:] ]]; do I=$((I+1)); done
+                pattern='^[a-zA-Z0-9_:]+'
+                while ((I<N)) && [[ ${S:I:1024} =~ $pattern ]]; do
+                    span=${BASH_REMATCH[0]}; I=$((I+${#span}))
+                done
                 name=${S:start:I-start}
                 if [[ -z $name ]]; then R='$'; return; fi
             fi
@@ -98,11 +112,23 @@ substitute() {
     esac
 }
 parse_word() {
-    local out= ch mode=bare depth=0
+    local out= ch mode=bare depth=0 span pattern
     ch=${S:I:1}
     if [[ $ch == '{' ]]; then mode=brace; depth=1; I=$((I+1))
     elif [[ $ch == '"' ]]; then mode=quote; I=$((I+1)); fi
+    # Match literal runs in bounded windows. Indexing the complete input once
+    # per character is especially costly in multibyte locales. Keep I in host
+    # character units, so dispatch still observes the caller's locale.
+    if [[ $mode == brace ]]; then pattern='^[^{}\\]+'
+    elif [[ $mode == quote ]]; then
+        if ((M)); then pattern='^[^"\\]+'; else pattern='^[^"\\$[]+'; fi
+    elif ((M)); then pattern='^[^ '$'\t\r\n''\\]+'
+    elif ((B)); then pattern='^[^] '$'\t\r\n''\\$[;]+'
+    else pattern='^[^ '$'\t\r\n''\\$[;]+'; fi
     while ((I<N)); do
+        if [[ ${S:I:1024} =~ $pattern ]]; then
+            span=${BASH_REMATCH[0]}; out+=$span; I=$((I+${#span})); continue
+        fi
         ch=${S:I:1}
         if [[ $mode == brace ]]; then
             I=$((I+1))
@@ -111,11 +137,11 @@ parse_word() {
                 '}') depth=$((depth-1)); if ((depth==0)); then break; fi;;
                 \\)
                     if ((I<N)); then
-                        if [[ ${S:I:1} == $'\n' ]]; then I=$((I-1)); escape_char; out=$out$R; continue; fi
-                        out=$out$ch${S:I:1}; I=$((I+1)); continue
+                        if [[ ${S:I:1} == $'\n' ]]; then I=$((I-1)); escape_char; out+=$R; continue; fi
+                        out+=$ch${S:I:1}; I=$((I+1)); continue
                     fi;;
             esac
-            out=$out$ch; continue
+            out+=$ch; continue
         fi
         if [[ $mode == quote && $ch == '"' ]]; then I=$((I+1)); mode=closed; break; fi
         if [[ $mode == bare ]]; then
@@ -128,7 +154,7 @@ parse_word() {
         fi
         if ((M)) && [[ $ch != \\ ]]; then R=$ch; I=$((I+1)); else substitute; fi
         ((C)) && return
-        out=$out$R
+        out+=$R
     done
     if [[ $mode == brace ]] && ((depth)); then fail 'missing close brace'; return; fi
     if [[ $mode == quote ]]; then fail 'missing close quote'; return; fi
@@ -143,18 +169,20 @@ parse_word() {
     R=$out
 }
 parse_list() {
-    local S=$1 I=0 N=${#1} M=1 B=0 ch
+    local S=$1 I=0 N=${#1} M=1 B=0 ch span blanks='^[ '$'\t\r\n'']+'
     ITEMS=()
     while ((I<N)); do
         ch=${S:I:1}
-        case $ch in ' '|$'\t'|$'\r'|$'\n') I=$((I+1)); continue;; esac
+        case $ch in ' '|$'\t'|$'\r'|$'\n')
+            [[ ${S:I:1024} =~ $blanks ]]; span=${BASH_REMATCH[0]}; I=$((I+${#span})); continue;;
+        esac
         if [[ ${S:I:2} == $'\\\n' ]]; then escape_char; continue; fi
         parse_word; ((C)) && return
         ITEMS+=("$R")
     done
 }
 eval_script() {
-    local S=$1 I=${2:-0} N=${#1} B=${3:-0} M=0 ch saved
+    local S=$1 I=${2:-0} N=${#1} B=${3:-0} M=0 ch saved span comment='^[^\\'$'\n'']+' blanks='^[ '$'\t\r'']+'
     local -a words=()
     local DEPTH=$((DEPTH+1))
     R=; C=0
@@ -162,11 +190,14 @@ eval_script() {
     while ((I<N)); do
         ch=${S:I:1}
         case $ch in
-            ' '|$'\t'|$'\r') I=$((I+1)); continue;;
+            ' '|$'\t'|$'\r')
+                [[ ${S:I:1024} =~ $blanks ]]; span=${BASH_REMATCH[0]}; I=$((I+${#span})); continue;;
             \\) if [[ ${S:I+1:1} == $'\n' ]]; then saved=$R; escape_char; R=$saved; continue; fi;;
             '#') if ((${#words[@]}==0)); then
                 while ((I<N)) && [[ ${S:I:1} != $'\n' ]]; do
-                    if [[ ${S:I:2} == $'\\\n' ]]; then I=$((I+2)); else I=$((I+1)); fi
+                    if [[ ${S:I:1024} =~ $comment ]]; then
+                        span=${BASH_REMATCH[0]}; I=$((I+${#span}))
+                    elif [[ ${S:I:2} == $'\\\n' ]]; then I=$((I+2)); else I=$((I+1)); fi
                 done
                 continue
             fi;;
