@@ -110,6 +110,8 @@ Native files define helpers and register commands; SDK files define procedures.
 Neither should invoke commands that require another library file during loading.
 Adding a file needs no launcher change. Scripts can also `source` additional
 Tcl files to extend the SDK for one application.
+Save all `.tcl` source files as UTF-8 (an optional UTF-8 BOM is accepted).
+The runtime assumes UTF-8 without validating it; other encodings are unsupported.
 See [the complete language and SDK specification](SPEC.md), including native
 extension examples, supported syntax, and deliberate Tcl differences.
 

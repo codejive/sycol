@@ -171,7 +171,8 @@ set words [list $text {}]  ;# Two elements, including the empty string.
 ```
 
 Parsing and evaluation are incremental: earlier commands can run before a later
-syntax error is found. There is no whole-file prevalidation or rollback.
+syntax error is found. There is no whole-file syntax prevalidation or rollback;
+NUL checks happen before evaluation.
 
 ## 4. Frames, procedures, and dispatch
 
@@ -331,9 +332,14 @@ use `list`/`concat` to retain argument boundaries.
 ### Text I/O and external commands
 
 File commands handle whole text files, close handles before returning, and use
-UTF-8. A leading UTF-8 BOM is accepted and removed when reading. NUL in text
-files is an error. Source additionally normalizes CRLF to LF; `readfile` retains
-line endings. Parent directories are not created by `writefile`. I/O failures
+UTF-8. Authors must save all `.tcl` source files as UTF-8, including the entry
+script, SDK files, and files loaded by `source` (regardless of their
+extension). This is an authoring requirement: the runtime does not validate or
+enforce UTF-8 encoding. Behavior for malformed UTF-8 or other encodings is
+unspecified and may differ between hosts. A leading UTF-8 BOM is accepted and
+removed when reading. NUL in text files is an error. Source additionally
+normalizes CRLF to LF; `readfile` retains line endings. Parent directories are
+not created by `writefile`. I/O failures
 are catchable language errors.
 
 `exec` resolves an external executable using its explicit path or host PATH.

@@ -16,4 +16,5 @@ quote_list "$(command -v "$engine")" "$root/tests/fixtures/probe.sh"
 probe=$R
 "$engine" ./.sycol/bin/sycol tests/exec.tcl "$probe" "$temp"
 "$engine" tests/discovery.sh
+"$engine" tests/encoding.sh
 "$engine" tests/launchers.sh

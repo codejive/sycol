@@ -23,6 +23,8 @@ try {
     if ($LASTEXITCODE) { throw 'Process suite failed' }
     & $engine -NoProfile -ExecutionPolicy Bypass -File tests/discovery.ps1
     if ($LASTEXITCODE) { throw 'Discovery suite failed' }
+    & $engine -NoProfile -ExecutionPolicy Bypass -File tests/encoding.ps1
+    if ($LASTEXITCODE) { throw 'Encoding suite failed' }
     & $engine -NoProfile -ExecutionPolicy Bypass -File tests/launchers.ps1
     if ($LASTEXITCODE) { throw 'Launcher suite failed' }
 } finally {

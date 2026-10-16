@@ -190,8 +190,13 @@ Register-SyNative 'puts' {
 function Invoke-SyNativeRead([string]$cmd, [string[]]$a) {
     $n=$a.Count
     if ($n -ne 1) { Set-SyArity "$cmd path"; return }
-    try { $text=[IO.File]::ReadAllText($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($a[0]), (New-Object Text.UTF8Encoding($false,$true))) }
+    # Decode as UTF-8 directly, without BOM-based encoding detection or validation.
+    try {
+        $bytes=[IO.File]::ReadAllBytes($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($a[0]))
+        $text=(New-Object Text.UTF8Encoding($false)).GetString($bytes)
+    }
     catch { Set-SyError "cannot read file: $($a[0])"; return }
+    if ($text.Length -and $text[0] -eq [char]0xFEFF) { $text=$text.Substring(1) }
     if ($text.IndexOf([char]0) -ge 0) { Set-SyError "NUL in text file: $($a[0])"; return }
     if ($cmd -ceq 'source') { Invoke-SyScript ($text.Replace("`r`n","`n")); Complete-SyReturn } else { $script:Sy.R=$text }
 }
