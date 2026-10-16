@@ -1,39 +1,42 @@
 # Lexical path handling shared by both hosts. No filesystem access is needed
 # except to expand a bare home name for dirname/tail, as in Tcl 8.6.
 proc sy.path.parts {path windows} {
-    set text {}
-    set index 0
-    while {< $index [string length $path]} {
-        set char [string range $path $index $index]
-        if [and {set windows} {eq $char "\\"}] { set char / }
-        set text $text$char
-        set index [+ $index 1]
-    }
+    # Split and recognize separators in one pass, without rebuilding the path
+    # character by character first (particularly costly for long temp paths).
+    set text $path
     set root {}
     if [and {set windows} {eq [string range $text 1 1] :}] {
         set root [string range $text 0 1]
         set text [string range $text 2 [string length $text]]
-        if [eq [string range $text 0 0] /] { set root $root/ }
+        set first [string range $text 0 0]
+        if [or {eq $first /} {eq $first "\\"}] { set root $root/ }
     }
     set names {}
     set word {}
     set index 0
     while {<= $index [string length $text]} {
         set char [string range $text $index $index]
+        if [eq $char "\\"] { if $windows { set char / } }
         if [or {eq $char /} {eq $char {}}] {
             if [ne $word {}] { lappend names $word; set word {} }
         } else { set word $word$char }
         set index [+ $index 1]
     }
     if [eq $root {}] {
-        if [and {set windows} {and {eq [string range $text 0 1] //} {>= [llength $names] 2}}] {
+        set first [string range $text 0 0]
+        set second [string range $text 1 1]
+        if $windows {
+            if [eq $first "\\"] { set first / }
+            if [eq $second "\\"] { set second / }
+        }
+        if [and {set windows} {and {eq $first$second //} {>= [llength $names] 2}}] {
             set root //[lindex $names 0]/[lindex $names 1]
             set rest {}
             set index 2
             while {< $index [llength $names]} { lappend rest [lindex $names $index]; set index [+ $index 1] }
             set names $rest
         } else {
-            if [eq [string range $text 0 0] /] { set root / }
+            if [eq $first /] { set root / }
         }
     }
     list $root $names

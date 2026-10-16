@@ -1,4 +1,21 @@
 test path-join-basic { file join a {} b//c/ } a/b/c
+
+test path-parts-mixed-windows-separators {
+    set parts [sy.path.parts {\/server\share/a b\\c//} 1]
+    set names [lindex $parts 1]
+    list [lindex $parts 0] [llength $names] [lindex $names 0] [lindex $names 1]
+} {//server/share 2 a\ b c}
+
+test path-parts-unix-literal-backslashes {
+    set names [lindex [sy.path.parts {a\b/c\d} 0] 1]
+    list [lindex $names 0] [lindex $names 1]
+} {a\\b c\\d}
+
+test path-parts-windows-drive-backslash {
+    set parts [sy.path.parts {C:\a\\b/} 1]
+    set names [lindex $parts 1]
+    list [lindex $parts 0] [lindex $names 0] [lindex $names 1]
+} {C:/ a b}
 test path-join-preserves-dot { file join a ./b .. } a/./b/..
 test path-join-absolute { file join a /b c } /b/c
 test path-join-home-reset { file join a ~/b } ~/b

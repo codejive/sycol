@@ -1,10 +1,5 @@
 # Shared option parsing; sy.file supplies only host filesystem operations.
 proc file {operation args} {
-    # These abbreviations are unambiguous in full Tcl's larger file command.
-    foreach entry {{copy 2} {delete 2} {type 2} {mkdir 2} {exists 3} {isfile 3} {isdirectory 3} {join 1} {dirname 2} {tail 2} {extension 3} {rootname 2} {size 2} {rename 3} {pathtype 1}} {
-        set command [lindex $entry 0]
-        if [and {>= [string length $operation] [lindex $entry 1]} {eq $operation [string range $command 0 [- [string length $operation] 1]]}] { set operation $command }
-    }
     if [eq $operation mkdir] {
         foreach path $args { sy.file mkdir $path }
         return {}
@@ -36,7 +31,19 @@ proc file {operation args} {
             return [sy.file $operation [lindex $args 0]]
         }
     }
-    if [and {ne $operation delete} {and {ne $operation copy} {ne $operation rename}}] { error "unknown file operation: $operation" }
+    if [and {ne $operation delete} {and {ne $operation copy} {ne $operation rename}}] {
+        # Full names take the direct paths above. Only abbreviations need this
+        # search; these prefixes are unambiguous in full Tcl's file command.
+        foreach entry {{copy 2} {delete 2} {type 2} {mkdir 2} {exists 3} {isfile 3} {isdirectory 3} {join 1} {dirname 2} {tail 2} {extension 3} {rootname 2} {size 2} {rename 3} {pathtype 1}} {
+            set command [lindex $entry 0]
+            if [and {>= [string length $operation] [lindex $entry 1]} {eq $operation [string range $command 0 [- [string length $operation] 1]]}] {
+                # Variadic args is already a properly quoted list; preserve
+                # its boundaries without decoding and encoding every path.
+                return [eval "file $command $args"]
+            }
+        }
+        error "unknown file operation: $operation"
+    }
     set force 0
     set index 0
     while {< $index [llength $args]} {

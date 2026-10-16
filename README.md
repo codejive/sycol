@@ -164,7 +164,8 @@ directory for generated files. CI covers macOS `/bin/bash` (the Bash 3.2
 target), current Linux Bash, Windows PowerShell, and PowerShell on Windows and
 Linux. CI configuration is included; running CI requires a hosted repository.
 
-For optional timings (file reading, startup, parsing, and list encoding), run
+For optional timings (file reading, SDK file/path operations, startup, parsing,
+and list encoding), run
 `bash tests/benchmark.sh` or `powershell` / `pwsh -NoProfile -File tests/benchmark.ps1`.
 To compare another installation, pass its interpreter file as the first Bash
 argument or PowerShell's `-Runtime` argument. Timings depend on the host and

@@ -28,6 +28,13 @@ try {
     "PowerShell $($PSVersionTable.PSVersion); runtime $Runtime; one warmup per case"
     Measure-SyCase 'readfile 64 KiB' 20 { Invoke-SyNativeRead 'readfile' @($path) }
     Measure-SyCase 'load SDK' 5 { Import-SySdk }
+    Measure-SyCase 'file exists (SDK)' 5 { Invoke-SyScript 'file exists .sycol/VERSION' }
+    Measure-SyCase 'file join long path (SDK)' 3 {
+        Invoke-SyScript 'file join C:/sycol-benchmark/long-temporary-directory/another-segment/filesystem child'
+    }
+    Measure-SyCase 'Windows path split (SDK)' 3 {
+        Invoke-SyScript 'sy.path.parts {C:\sycol-benchmark\long-temporary-directory\another-segment\filesystem} 1'
+    }
     Measure-SyCase 'startup + hello example' 5 {
         & $engine -NoProfile -ExecutionPolicy Bypass -File $Runtime examples/hello.tcl > $null
         if ($LASTEXITCODE) { throw 'benchmark startup failed' }

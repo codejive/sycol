@@ -67,6 +67,21 @@ test file-delete-stops-on-error {
     list $code [catch {file type "$::fsroot/delete-first"}] [readfile "$::fsroot/delete-last"]
 } {1 1 last}
 test file-abbreviations { file cop "$::fsroot/source/.hidden" "$::fsroot/abbreviation"; set kind [file ty "$::fsroot/abbreviation"]; file del "$::fsroot/abbreviation"; set kind } file
+
+test file-abbreviations-dispatch {
+    file mk "$::fsroot/abbreviations"
+    file co "$::fsroot/source/.hidden" "$::fsroot/abbreviations/a ; literal.txt"
+    file ren "$::fsroot/abbreviations/a ; literal.txt" "$::fsroot/abbreviations/b.txt"
+    set path "$::fsroot/abbreviations/b.txt"
+    set joined [file j dir b.txt]
+    set result [list [file ty $path] [file exi $path] [file isf $path] [file isd "$::fsroot/abbreviations"] [file di $joined] [file ta $joined] [file ext $joined] [file ro $joined] [file si $path] [file p relative]]
+    file de -force "$::fsroot/abbreviations"
+    set result
+} {file 1 1 1 dir b.txt .txt dir/b 6 relative}
+
+test file-abbreviations-invalid {
+    list [catch {file c a b}] [catch {file d a}] [catch {file t a}] [catch {file join-extra a b}] [catch {file exi}]
+} {1 1 1 1 1}
 test file-options {
     set count 0
     foreach script {{file} {file bogus} {file list a b} {file type} {file copy -recursive a b} {file copy -attributes a b} {file copy a} {file delete -attributes a} {file copy -bogus a b} {file delete -recursive a} {file copy {} a}} {

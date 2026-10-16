@@ -22,6 +22,9 @@ measure() {
 printf 'Bash %s; locale %s; runtime %s\n' "$BASH_VERSION" "${LC_ALL:-${LANG:-unset}}" "$runtime"
 measure 'readfile 64 KiB' 5 sy_cmd_readfile "$temp/data.txt"
 measure 'load SDK' 5 load_sdk
+measure 'file exists (SDK)' 5 eval_script 'file exists .sycol/VERSION'
+measure 'file join long path (SDK)' 3 eval_script 'file join C:/sycol-benchmark/long-temporary-directory/another-segment/filesystem child'
+measure 'Windows path split (SDK)' 3 eval_script 'sy.path.parts {C:\sycol-benchmark\long-temporary-directory\another-segment\filesystem} 1'
 measure 'startup + hello example' 5 "$engine" "$runtime" examples/hello.tcl
 measure 'parse bare 16 KiB' 3 eval_script "set value $text"
 measure 'parse quoted 16 KiB' 3 eval_script "set value \"$text\""
