@@ -254,12 +254,29 @@ sy_cmd_getenv() {
 sy_register 'getenv' sy_cmd_getenv
 
 sy_cmd_exec() {
-    local out path status
-    if (($#<1)); then arity 'exec program ?arg ...?'; return; fi
+    local out path status capture=0 temp err failed=0
+    if [[ $1 == -capture ]]; then capture=1; shift; fi
+    if [[ $1 == -- ]]; then shift; fi
+    if (($#<1)); then arity 'exec ?-capture? ?--? program ?arg ...?'; return; fi
     # type -P avoids Bash functions and builtins. Preserve trailing newlines.
     path=$(type -P -- "$1")
     if [[ -z $path || ! -x $path ]]; then fail "cannot execute: $1"; return; fi
     shift
+    if ((capture)); then
+        temp=$(mktemp -d "${TMPDIR:-/tmp}/sycol-exec.XXXXXXXX")
+        if [[ -z $temp || ! -d $temp ]]; then fail 'cannot capture process output'; return; fi
+        # Files avoid pipe deadlocks; a sentinel preserves every trailing newline.
+        if { > "$temp/stdout" && > "$temp/stderr"; }; then
+            "$path" "$@" > "$temp/stdout" 2> "$temp/stderr"; status=$?
+            out=$(if ! cat -- "$temp/stdout"; then exit 1; fi; printf '\034') || failed=1
+            err=$(if ! cat -- "$temp/stderr"; then exit 1; fi; printf '\034') || failed=1
+        else failed=1; fi
+        rm -f -- "$temp/stdout" "$temp/stderr" || failed=1
+        rmdir -- "$temp" || failed=1
+        if ((failed)); then fail 'cannot capture process output'; return; fi
+        quote_list "$status" "${out%$'\034'}" "${err%$'\034'}"
+        return
+    fi
     out=$("$path" "$@"; status=$?; printf '\034%s' "$status")
     status=${out##*$'\034'}; out=${out%$'\034'*}
     if ((status)); then fail "process exited with status $status"; return; fi

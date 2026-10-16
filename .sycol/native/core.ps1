@@ -261,12 +261,21 @@ function ConvertTo-SyWindowsArgument([string]$Value) {
     [void]$b.Append(('\' * (2*$slashes))); [void]$b.Append('"'); return $b.ToString()
 }
 function Invoke-SyProcess([string[]]$Arguments) {
-    if (!$Arguments.Count) { Set-SyArity 'exec program ?arg ...?'; return }
+    $capture=$false; $first=0
+    if ($Arguments.Count -gt $first -and $Arguments[$first] -ceq '-capture') { $capture=$true; $first++ }
+    if ($Arguments.Count -gt $first -and $Arguments[$first] -ceq '--') { $first++ }
+    if ($Arguments.Count -le $first) { Set-SyArity 'exec ?-capture? ?--? program ?arg ...?'; return }
+    $Arguments=[string[]]$Arguments[$first..($Arguments.Count-1)]
     $process=New-Object Diagnostics.Process
+    $started=$false
     try {
         $info=$process.StartInfo; $info.FileName=$Arguments[0]; $info.UseShellExecute=$false
         $info.WorkingDirectory=(Get-Location).ProviderPath; $info.RedirectStandardOutput=$true
         $info.StandardOutputEncoding=New-Object Text.UTF8Encoding($false)
+        if ($capture) {
+            $info.RedirectStandardError=$true
+            $info.StandardErrorEncoding=New-Object Text.UTF8Encoding($false)
+        }
         if ($info.PSObject.Properties['ArgumentList']) {
             for ($i=1; $i -lt $Arguments.Count; $i++) { $info.ArgumentList.Add($Arguments[$i]) }
         } else {
@@ -274,10 +283,24 @@ function Invoke-SyProcess([string[]]$Arguments) {
             $info.Arguments=[string]::Join(' ',[string[]]$quoted)
         }
         if (!$process.Start()) { Set-SyError "cannot execute: $($Arguments[0])"; return }
+        $started=$true
+        if ($capture) {
+            # Both readers must run before waiting for either stream or the child.
+            $stdoutTask=$process.StandardOutput.ReadToEndAsync()
+            $stderrTask=$process.StandardError.ReadToEndAsync()
+            $process.WaitForExit()
+            $output=$stdoutTask.GetAwaiter().GetResult()
+            $errorOutput=$stderrTask.GetAwaiter().GetResult()
+            ConvertTo-SyList @([string]$process.ExitCode,$output,$errorOutput)
+            return
+        }
         $output=$process.StandardOutput.ReadToEnd(); $process.WaitForExit()
         if ($process.ExitCode) { Set-SyError "process exited with status $($process.ExitCode)"; return }
         if ($output.EndsWith("`n")) { $output=$output.Substring(0,$output.Length-1); if ($output.EndsWith("`r")) { $output=$output.Substring(0,$output.Length-1) } }
         $script:Sy.R=$output
-    } catch { Set-SyError "cannot execute: $($Arguments[0])" }
+    } catch {
+        if ($started -and $capture) { Set-SyError 'cannot capture process output' }
+        else { Set-SyError "cannot execute: $($Arguments[0])" }
+    }
     finally { $process.Dispose() }
 }

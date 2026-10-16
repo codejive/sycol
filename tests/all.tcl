@@ -187,7 +187,7 @@ test writefile {
 } "space ; \$ \[ ] \\ quote \"\n\n"
 test getenv-missing { getenv SYCOL_TEST_VARIABLE_THAT_IS_UNSET } {}
 test exec-missing { exec sycol_nonexistent_executable_7654321 } {cannot execute: sycol_nonexistent_executable_7654321} 1
-test exec-arity { exec } {wrong # args: exec program ?arg ...?} 1
+test exec-arity { exec } {wrong # args: exec ?-capture? ?--? program ?arg ...?} 1
 test argv-count { llength $::argv } 3
 test argv-literal { lindex $::argv 1 } {argument with spaces; $literal [brackets]}
 

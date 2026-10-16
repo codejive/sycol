@@ -23,6 +23,21 @@ puts "total: $total"
 puts [exec git --version]
 ```
 
+Capture a process's status, stdout, and stderr as a three-element list:
+
+```tcl
+set result [exec -capture -- git status --short]
+puts "status: [lindex $result 0]"
+puts -nonewline [lindex $result 1]
+puts -nonewline [lindex $result 2]
+```
+
+`-capture` returns normally even for a nonzero child exit and preserves all
+trailing newlines in both streams. Launch and capture failures remain errors.
+Plain `exec` streams stderr, raises an error on nonzero exit, and removes one
+final newline from stdout. Bash capture requires `mktemp`, `cat`, `rm`, and
+`rmdir`; it stores output in private temporary files while the child runs.
+
 List, inspect, copy, and delete filesystem entries using literal paths:
 
 ```tcl

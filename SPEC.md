@@ -292,7 +292,7 @@ do not return a meaningful value return the empty string.
 | `pwd` | Return the current working directory in host path format |
 | `cd path` | Change the host's working directory |
 | `getenv name` | Read a process environment variable; absent is empty |
-| `exec program ?arg ...?` | Execute one external program, detailed below |
+| `exec ?-capture? ?--? program ?arg ...?` | Execute one external program, detailed below |
 | `exit ?status?` | Immediately terminate the process with status 0..255; default 0 |
 | `sy.file operation arguments...` | Host filesystem primitive used by the shared `file` procedure, detailed below |
 
@@ -349,19 +349,42 @@ normalizes CRLF to LF; `readfile` retains line endings. Parent directories are
 not created by `writefile`. I/O failures
 are catchable language errors.
 
-`exec` resolves an external executable using its explicit path or host PATH.
+`exec ?-capture? ?--? program ?arg ...?` resolves an external executable using
+its explicit path or host PATH. Only an initial `-capture` is an option; an
+optional `--` after it (or as the first argument) ends option recognition.
+All words after the program are literal arguments, including `-capture`, `--`,
+and Tcl redirection syntax. Use `--` to invoke a program named `-capture` or `--`.
 Shell aliases, functions, and built-ins are not commands for this purpose.
 Each Sycol word becomes one OS argument, including empty strings. There is no
 implicit shell, interpolation, globbing, pipeline, redirection, background job,
-or expansion of `$HOME`. Inherited environment, stdin, stderr, and current
-working directory belong to the child. Stdout is captured as text. On success,
+or expansion of `$HOME`. Environment, stdin, and current working directory
+are inherited. Without `-capture`, stderr is also inherited and stdout is
+captured as text. On success,
 one final LF, including an immediately preceding CR if present, is removed.
 Other trailing newlines and a lone trailing CR are retained.
 
-A nonzero exit is an error `process exited with status N`; captured stdout is
-discarded and stderr has already been streamed. Failure to launch is an error
-`cannot execute: PROGRAM`. The API does not expose a combined stderr stream,
-partial stdout on failure, timeout, or a process handle. Programs that require
+Without `-capture`, a nonzero exit is an error `process exited with status N`;
+captured stdout is discarded and stderr has already been streamed. Failure to launch is an error
+`cannot execute: PROGRAM`.
+
+`-capture` is a Sycol extension, not a full Tcl option. It returns a proper
+three-element list: `status stdout stderr`. A nonzero child exit status returns
+normally rather than raising a language error. Both streams retain all trailing
+LF and CR characters, including CRLF; stderr is captured rather than streamed.
+The status is the host-reported decimal process status. Signal termination has
+no portable metadata: Bash normally reports `128 + signal`; PowerShell reports
+the platform process exit code. No ordering between the two streams is exposed.
+Wrong arguments, executable lookup/start failures, and capture I/O failures
+remain errors. Capture I/O failures report `cannot capture process output`.
+As with plain `exec`, Bash executable-loader failures after successful lookup
+can appear as child statuses (typically 126 or 127), with host diagnostics.
+The existing UTF-8-without-NUL text domain applies to both output streams.
+
+Bash capture uses a private temporary directory under `${TMPDIR:-/tmp}` and
+requires standard `mktemp`, `cat`, `rm`, and `rmdir` utilities on PATH. It reads
+both files after the child exits and removes them before returning. PowerShell
+drains both redirected streams concurrently using .NET asynchronous readers.
+Neither mode exposes a timeout or a process handle. Programs that require
 a terminal should be launched through a custom native extension.
 
 Windows PowerShell passes arguments using .NET process APIs, not its native
@@ -377,6 +400,10 @@ Examples (assuming those executables are installed):
 puts [exec git status --short]
 set filename {file with spaces.txt}
 puts [exec git log -1 -- $filename]
+set result [exec -capture -- git status --short]
+puts "status: [lindex $result 0]"
+puts -nonewline [lindex $result 1]
+puts -nonewline [lindex $result 2]
 # An OS shell is available only when explicitly requested:
 puts [exec bash -c {printf '%s\n' "$HOME"}]
 ```
@@ -665,7 +692,8 @@ file writing, arguments, and errors. Each Tcl test captures the result and
 completion and checks them against an expected value. Failure counts cause a
 language error and therefore a failing process status. Separate process tests
 verify exact argument boundaries, newline trimming, inherited stderr, failed
-exit status, and current working directory using small host-specific probes.
+exit status, capture records and preserved line endings, simultaneous large
+stdout/stderr output, and current working directory using small host-specific probes.
 
 Discovery tests copy an installation into a unique temporary directory and
 verify ordering, extension filtering, argument boundaries, overrides, embedding,
