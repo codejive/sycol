@@ -72,3 +72,21 @@ test parser-long-whitespace {
          [lindex "$spaces\{ok\}$spaces" 0] \
          [eval "set result \"a\\\n${spaces}b\""]
 } {ok ok a\ b}
+test parser-literal-runs-around-substitutions {
+    set value middle
+    list [eval {set result prefix${value}suffix[set value]tail}] \
+         [eval {set result "prefix${value}suffix[set value]tail"}]
+} {prefixmiddlesuffixmiddletail prefixmiddlesuffixmiddletail}
+test parser-closing-brackets-in-literals {
+    list [eval {set result before]after}] [set result [set value "before]after"]] \
+         [set result [set value {before]after}]]
+} {before\]after before\]after before\]after}
+test parser-list-encoding-adjacent-specials {
+    set values [list {plain} {éΩ😀} {a\b} {{}[]$";#} " \t\r\n" {}]
+    list [lindex $values 0] [lindex $values 1] [lindex $values 2] \
+         [eq [lindex $values 3] {{}[]$";#}] [eq [lindex $values 4] " \t\r\n"] [lindex $values 5]
+} {plain éΩ😀 a\\b 1 1 {}}
+test parser-list-encoding-escape-order {
+    set value "\\n\n\\r\r\\t\t"
+    eq [lindex [list $value] 0] $value
+} 1

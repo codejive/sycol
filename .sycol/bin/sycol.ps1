@@ -40,22 +40,15 @@ function Set-SyVariable([string]$Name, [string]$Value) {
     $script:Sy.Vars[$key]=$Value; $script:Sy.R=$Value
 }
 function ConvertTo-SyList([string[]]$Words) {
-    $parts=New-Object 'System.Collections.Generic.List[string]'
+    $parts=[Collections.Generic.List[string]]::new()
+    $special=[char[]](" `t`r`n"+'\{}[]$";#')
     foreach ($word in $Words) {
         if (!$word.Length) { $parts.Add('{}'); continue }
-        $b=New-Object Text.StringBuilder
-        foreach ($ch in $word.ToCharArray()) {
-            switch -CaseSensitive ([string]$ch) {
-                "`n" { [void]$b.Append('\n') }
-                "`r" { [void]$b.Append('\r') }
-                "`t" { [void]$b.Append('\t') }
-                default {
-                    if (' \{}[]$";#'.Contains([string]$ch)) { [void]$b.Append('\') }
-                    [void]$b.Append($ch)
-                }
-            }
-        }
-        $parts.Add($b.ToString())
+        if ($word.IndexOfAny($special) -lt 0) { $parts.Add($word); continue }
+        # Escape existing backslashes first, then encode control characters.
+        # Native replacements also avoid a PowerShell loop for dense escapes.
+        $escaped=[regex]::Replace($word,'([\\{}\[\]$";# ])','\$1')
+        $parts.Add($escaped.Replace("`n",'\n').Replace("`r",'\r').Replace("`t",'\t'))
     }
     $script:Sy.R=[string]::Join(' ', $parts.ToArray())
 }
@@ -80,8 +73,8 @@ function Read-SySubstitution($Parser) {
             $Parser.I++; $start=$Parser.I
             if ($Parser.I -lt $Parser.S.Length -and $Parser.S[$Parser.I] -ceq '{') {
                 $Parser.I++; $start=$Parser.I
-                while ($Parser.I -lt $Parser.S.Length -and $Parser.S[$Parser.I] -cne '}') { $Parser.I++ }
-                if ($Parser.I -eq $Parser.S.Length) { Set-SyError 'missing variable close brace'; return }
+                $Parser.I=$Parser.S.IndexOf([char]'}',$start)
+                if ($Parser.I -lt 0) { $Parser.I=$Parser.S.Length; Set-SyError 'missing variable close brace'; return }
                 $name=$Parser.S.Substring($start,$Parser.I-$start); $Parser.I++
             } else {
                 while ($Parser.I -lt $Parser.S.Length -and [string]$Parser.S[$Parser.I] -cmatch '^[a-zA-Z0-9_:]$') { $Parser.I++ }
@@ -98,10 +91,26 @@ function Read-SySubstitution($Parser) {
     }
 }
 function Read-SyWord($Parser) {
-    $b=New-Object Text.StringBuilder; $mode='bare'; $depth=0
+    $b=[Text.StringBuilder]::new(); $mode='bare'; $depth=0
     if ($Parser.S[$Parser.I] -ceq '{') { $mode='brace'; $depth=1; $Parser.I++ }
     elseif ($Parser.S[$Parser.I] -ceq '"') { $mode='quote'; $Parser.I++ }
+    # Scan literal runs inside .NET, then use the character parser only at
+    # syntax boundaries. IndexOfAny and Append retain UTF-16 indexing on 5.1+.
+    $text=$Parser.S
+    if ($mode -eq 'brace') { $stops=[char[]]'{}\' }
+    elseif ($mode -eq 'quote') {
+        if ($Parser.M) { $stops=[char[]]'"\' } else { $stops=[char[]]'"\$[' }
+    } else {
+        $stops=" `t`r`n\"
+        if (!$Parser.M) { $stops+='$[;'; if ($Parser.B) { $stops+=']' } }
+        $stops=[char[]]$stops
+    }
     while ($Parser.I -lt $Parser.S.Length) {
+        $end=$text.IndexOfAny($stops,$Parser.I)
+        if ($end -lt 0) { $end=$text.Length }
+        if ($end -gt $Parser.I) {
+            [void]$b.Append($text,$Parser.I,($end-$Parser.I)); $Parser.I=$end; continue
+        }
         $ch=[string]$Parser.S[$Parser.I]
         if ($mode -eq 'brace') {
             $Parser.I++
@@ -136,7 +145,7 @@ function Read-SyWord($Parser) {
     $script:Sy.R=$b.ToString()
 }
 function ConvertFrom-SyList([string]$Text) {
-    $p=@{S=$Text; I=0; M=$true; B=$false}; $items=New-Object 'System.Collections.Generic.List[string]'
+    $p=@{S=$Text; I=0; M=$true; B=$false}; $items=[Collections.Generic.List[string]]::new()
     while ($p.I -lt $p.S.Length) {
         if (" `t`r`n".Contains([string]$p.S[$p.I])) { $p.I++; continue }
         if ($p.S[$p.I] -ceq '\' -and $p.I+1 -lt $p.S.Length -and $p.S[$p.I+1] -ceq "`n") { Read-SyEscape $p; continue }
@@ -149,7 +158,7 @@ function Invoke-SyParser($Parser) {
     $script:Sy.Depth++; $script:Sy.R=''; $script:Sy.C=0
     try {
         if ($script:Sy.Depth -gt 64) { Set-SyError 'evaluation depth exceeded'; return }
-        $words=New-Object 'System.Collections.Generic.List[string]'
+        $words=[Collections.Generic.List[string]]::new()
         while ($Parser.I -lt $Parser.S.Length) {
             $ch=[string]$Parser.S[$Parser.I]
             if (" `t`r".Contains($ch)) { $Parser.I++; continue }
@@ -157,7 +166,11 @@ function Invoke-SyParser($Parser) {
                 $saved=$script:Sy.R; Read-SyEscape $Parser; $script:Sy.R=$saved; continue
             }
             if ($ch -ceq '#' -and !$words.Count) {
+                $stops=[char[]]"\`n"
                 while ($Parser.I -lt $Parser.S.Length -and $Parser.S[$Parser.I] -cne "`n") {
+                    $end=$Parser.S.IndexOfAny($stops,$Parser.I)
+                    if ($end -lt 0) { $Parser.I=$Parser.S.Length; break }
+                    if ($end -gt $Parser.I) { $Parser.I=$end; continue }
                     if ($Parser.S[$Parser.I] -ceq '\' -and $Parser.I+1 -lt $Parser.S.Length -and $Parser.S[$Parser.I+1] -ceq "`n") { $Parser.I+=2 }
                     else { $Parser.I++ }
                 }
