@@ -733,6 +733,42 @@ macOS to exercise the 3.2 target and runs Windows PowerShell 5.1 separately
 from PowerShell 7. CI also checks PowerShell on Unix. Local availability of a
 newer Bash does not establish that the 3.2 matrix has passed.
 
+Test timing is implemented exclusively in test-side Bash/PowerShell helpers,
+without a production native command or SDK addition. The embedding launchers
+register `test.time name script`, which evaluates once in the current frame
+and preserves result, completion code, pending return code, and return level.
+It records the elapsed body duration even for nonzero completions. Shared
+named tests, process checks, and filesystem-move checks are timed individually;
+other host probes are grouped. Native interpreter loading and each SDK module
+are reported separately from test bodies. `phase/startup` times a fresh process
+running an empty script, including interpreter initialization and SDK loading.
+Group times include process startup; module-loading times do not. Suite time
+includes driver setup and cleanup, but excludes the separate startup probe,
+timing-report self-checks, and final report rendering. These overlapping
+measurements are not additive; the named-test count counts recorded bodies,
+including test-helper conformance checks, rather than every host assertion.
+
+Bash uses its built-in `time` with millisecond precision, without assuming a
+monotonic clock. PowerShell uses `Diagnostics.Stopwatch`, rounded down to whole
+milliseconds. Timing warnings are informational. The default regression rule
+requires both an absolute increase greater than 100 ms and a relative increase
+greater than 25%; zero baseline durations and missing entries are skipped.
+Expected maximum durations are explicitly configured per measurement. Baselines
+must match host, runtime version/executable, machine, OS, architecture, locale,
+clock, and symbolic-link test availability; otherwise comparison is skipped.
+See [README.md](README.md) for configuration variables and examples.
+
+Both drivers write UTF-8, LF-terminated TSV records with three fields and no
+embedded tabs/newlines: `meta KEY VALUE` identifies format `sycol-timing-v1` and
+the comparison environment; `test NAME MILLISECONDS`, `phase NAME MILLISECONDS`,
+`group NAME MILLISECONDS`, and `suite total MILLISECONDS` contain measurements;
+`status exit CODE` records the suite exit status. The default paths are
+`.test-tmp/timings-bash.tsv` and `.test-tmp/timings-powershell.tsv`. Reports are
+written after failed suites too, preserving completed measurements and the
+failing process status. Baselines are read as data and never executed as shell
+source. Neither timing helper dependencies nor reporting commands become
+interpreter runtime dependencies.
+
 Any language or SDK extension must update this spec, add shared Tcl tests,
 and work on both hosts. Prefer a Tcl procedure whenever the existing native
 contracts suffice. Add a native primitive only for a required host facility,

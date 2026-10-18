@@ -194,6 +194,62 @@ directory for generated files. CI covers macOS `/bin/bash` (the Bash 3.2
 target), current Linux Bash, Windows PowerShell, and PowerShell on Windows and
 Linux. CI configuration is included; running CI requires a hosted repository.
 
+Each run also prints total suite time, the number of timed named tests, the ten
+slowest tests, separate native/SDK module-loading measurements, and timings for
+the shared, filesystem-move, native-extension, process, discovery, encoding, and
+launcher groups. Named Tcl test timings cover the body, including expected
+errors, and exclude assertion/reporting overhead. Host-only probes are measured
+as groups. `phase/startup` measures a fresh process executing an empty workload,
+including interpreter initialization and SDK loading. Group timings include
+child-process startup; module timings exclude process creation. These overlapping
+measurements must not be added together.
+
+The drivers save UTF-8 TSV results to `.test-tmp/timings-bash.tsv` or
+`.test-tmp/timings-powershell.tsv`, including partial results and exit status on
+test failure. Set `SYCOL_TIMING_OUTPUT` to choose another file in an existing
+directory. Timings use Bash's built-in `time` and PowerShell's `Stopwatch`, with
+integer millisecond output and no additional language dependency. Bash elapsed
+time is not guaranteed monotonic; very short tests can round to zero. The
+test-only launchers register the internal `test.time name script` helper;
+normal Sycol has no timing command.
+
+To compare runs, save a result as a baseline and select it on a later run:
+
+```sh
+cp .test-tmp/timings-bash.tsv .test-tmp/baseline-bash.tsv
+SYCOL_TIMING_BASELINE=.test-tmp/baseline-bash.tsv bash tests/run.sh
+```
+
+```powershell
+Copy-Item .test-tmp/timings-powershell.tsv .test-tmp/baseline-powershell.tsv
+$env:SYCOL_TIMING_BASELINE='.test-tmp/baseline-powershell.tsv'
+pwsh -NoProfile -File tests/run.ps1
+```
+
+Comparison requires matching host, runtime version and executable, machine,
+OS, architecture, locale, clock, and symbolic-link fixture availability.
+Mismatches are reported and skipped. Preserve separate baselines for Windows
+PowerShell and PowerShell 7. A regression warning requires an increase strictly
+greater than **both 100 ms and 25%** by default. Override these with
+`SYCOL_TIMING_REGRESSION_MS` and `SYCOL_TIMING_REGRESSION_PERCENT` (nonnegative
+integers). Zero-duration baseline entries have no meaningful percentage and
+are skipped. Missing baseline tests are skipped too.
+
+Set `SYCOL_TIMING_EXPECTED` to a UTF-8 file containing an exact measurement key,
+a tab, and an explicitly expected maximum duration in integer milliseconds:
+
+```text
+# The separator below is a literal tab.
+test/exec-capture	10000
+group/discovery	5000
+```
+
+Keys use `test/NAME`, `phase/NAME`, `group/NAME`, or `suite/total`; copy exact
+names from the result file. Blank lines and `#` comments are allowed. All paths
+resolve from the repository root. Timing warnings are informational and never
+change test exit status; invalid configuration or unreadable files are errors.
+The two regression settings and duration values accept at most nine digits.
+
 For optional timings (file reading, SDK file/path operations, startup, parsing,
 and list encoding), run
 `bash tests/benchmark.sh` or `powershell` / `pwsh -NoProfile -File tests/benchmark.ps1`.

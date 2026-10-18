@@ -3,7 +3,9 @@ set passed 0
 set failed 0
 proc test {name body expected {expectedCode 0}} {
     global passed failed
-    set code [catch $body actual]
+    if [ne [getenv SYCOL_TIMING_FILE] {}] {
+        set code [catch [list test.time $name $body] actual]
+    } else { set code [catch $body actual] }
     if [and {== $code $expectedCode} {eq $actual $expected}] {
         incr passed
         puts "ok - $name"
@@ -204,6 +206,7 @@ source tests/parser.tcl
 source tests/lists.tcl
 source tests/files.tcl
 source tests/paths.tcl
+if [ne [getenv SYCOL_TIMING_FILE] {}] {source tests/timing.tcl}
 
 puts "$passed tests passed; $failed failed"
 if [> $failed 0] { error "$failed tests failed" }

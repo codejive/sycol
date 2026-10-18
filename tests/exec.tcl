@@ -1,9 +1,12 @@
 # argv[0] is a list containing a native executable and its probe arguments.
+source tests/test-run.tcl
 set probe [lindex $argv 0]
 set failed 0
 proc check {name expected arguments} {
     global probe failed
-    set actual [apply exec [concat $probe $arguments]]
+    if [ne [getenv SYCOL_TIMING_FILE] {}] {
+        set actual [test.time $name [list apply exec [concat $probe $arguments]]]
+    } else { set actual [apply exec [concat $probe $arguments]] }
     if [ne $actual $expected] {
         incr failed
         puts "FAIL - ${name}: expected ([list $expected]), got ([list $actual])"
@@ -12,9 +15,12 @@ proc check {name expected arguments} {
 check exec-arguments {<><a b><; $literal [brackets]><"quoted"><end\>} [list args {} {a b} {; $literal [brackets]} {"quoted"} "end\\"]
 check exec-newlines "line\n" {newlines}
 check exec-carriage-return "line\r" {carriage}
+test-run exec-failure {
 set code [catch {apply exec [concat $probe {fail}]} message]
 if [or {!= $code 1} {ne $message {process exited with status 7}}] {error "bad process failure: $code $message"}
+}
 puts {ok - exec-failure}
+test-run exec-capture {
 foreach status {0 7} {
     set result [apply exec [concat {-capture --} $probe [list capture $status]]]
     set expected [list $status "out ; \[literal\] {x} \\ \"\r\n\n" "err\r\n\n"]
@@ -36,6 +42,7 @@ foreach arguments {{} {-capture} {--} {-capture --}} {
 }
 if [!= [catch {exec -capture -- ./sycol-nonexistent-program} message] 1] {error {missing executable accepted}}
 if [ne $message {cannot execute: ./sycol-nonexistent-program}] {error "bad launch error: $message"}
+}
 puts {ok - exec-capture}
 set original [pwd]
 cd [lindex $argv 1]

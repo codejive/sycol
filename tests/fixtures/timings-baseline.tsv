@@ -1,0 +1,13 @@
+meta	format	sycol-timing-v1
+meta	host	fixture
+meta	runtime	1
+test	slow	100
+test	tiny	10
+test	absolute	1000
+test	relative	1
+test	zero	0
+test	equal	100
+phase	sdk	75
+group	opaque	500
+suite	total	1500
+status	exit	0
