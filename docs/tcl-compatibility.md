@@ -65,6 +65,11 @@ frame. Procedures are global definitions without closures. Script procedures
 can replace other Tcl procedures, but native handlers always win. This differs
 from Tcl command replacement; same-name Tcl definitions remain hidden. There
 is no package autoloading: Sycol-specific paths extend `source` lookup.
+The shipped `incr`, `append`, `concat`, and `lappend` are native replacements
+with portable Tcl fallbacks, available before SDK loading. Same-name Tcl
+definitions remain hidden. Native replacements preserve public behavior, not
+incidental internal calls such as `incr` invoking `+` or `concat` invoking
+`append`; those helper calls are not extension hooks.
 There is no command renaming/deletion,
 introspection, or `unknown` dispatch hook.
 

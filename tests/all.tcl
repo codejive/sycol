@@ -206,6 +206,7 @@ test arity-errors {
 
 source ./tests/parser.tcl
 source ./tests/lists.tcl
+source ./tests/sdk-replacements.tcl
 source ./tests/files.tcl
 source ./tests/paths.tcl
 if [ne [getenv SYCOL_TIMING_FILE] {}] {source ./tests/timing.tcl}

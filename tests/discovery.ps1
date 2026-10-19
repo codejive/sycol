@@ -109,9 +109,32 @@ throw 'bad-native'
     & $engine -NoProfile -ExecutionPolicy Bypass -File .sycol/bin/sycol.ps1 test.tcl
     if ($LASTEXITCODE) { throw 'module conformance failed' }
     . ./.sycol/bin/sycol.ps1
-    Invoke-SyCommand @('incr','n')
-    if ($script:Sy.C -ne 1) { throw 'SDK loaded during embedding' }
+    if ($script:Sy.Procs.Count) { throw 'SDK loaded during embedding' }
+    Get-SyVariable ::sycol_version
+    if ($script:Sy.C -ne 1) { throw 'startup globals initialized during embedding' }
     $script:Sy.C=0
+    Invoke-SyScript 'set n 1; incr n; append n x; lappend items $n; concat $items'
+    if ($script:Sy.C -or $script:Sy.R -cne '2x' -or $script:Sy.Procs.Count) { throw 'native bootstrap failed' }
+    Import-SySdk
+    if ($script:Sy.C -or !$script:Sy.Procs.Count) { throw 'explicit SDK load failed' }
+    Invoke-SyScript 'incr n 0'
+    if ($script:Sy.C -ne 1 -or $script:Sy.R -cne 'expected integer: 2x') { throw 'native after SDK load failed' }
+    $script:Sy.C=0
+    foreach ($promoted in @('incr','append','concat','lappend')) {
+        Invoke-SyCommand @('proc',$promoted,'args','return hidden')
+    }
+    Invoke-SyScript 'set n 1; incr n; append n x; lappend items z; concat $items'
+    if ($script:Sy.C -or $script:Sy.R -cne '2x z') { throw 'native precedence failed' }
+    Invoke-SyScript 'set n 0; incr n invalid'
+    if ($script:Sy.C -ne 1 -or $script:Sy.R -cne 'expected integer: invalid') { throw 'native error retried Tcl' }
+    $script:Sy.C=0
+    Import-SySdk; Import-SySdk
+    if ($script:Sy.C) { throw 'repeated SDK loading failed' }
+    foreach ($promoted in @('incr','append','concat','lappend')) {
+        Register-SyNative $promoted { param([string[]]$Words); $script:Sy.R='replaced' }
+        Invoke-SyCommand @($promoted)
+        if ($script:Sy.C -or $script:Sy.R -cne 'replaced') { throw 'later registration failed' }
+    }
     Set-Location -LiteralPath $root
     if (Start-Sycol @("$temp/empty.tcl")) { throw 'embedded cwd independence failed' }
     foreach ($directory in @('override sdk','override native')) { [void][IO.Directory]::CreateDirectory("$temp/$directory") }

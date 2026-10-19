@@ -1,8 +1,8 @@
 source files.tcl
 # The drivers place these roots on different filesystems when available.
 source ./tests/test-run.tcl
-set from [file join [lindex $argv 0] move-source]
-set to [file join [lindex $argv 1] move-target]
+set from "[lindex $argv 0]/move-source"
+set to "[lindex $argv 1]/move-target"
 file mkdir $from $to
 proc check {name actual expected} {
     if [ne $actual $expected] { error "$name: expected [list $expected], got [list $actual]" }

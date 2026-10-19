@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 . "$PSScriptRoot/timing.ps1"
 $timingWatch=[Diagnostics.Stopwatch]::StartNew()
 . "$PSScriptRoot/../.sycol/bin/sycol.ps1"
+. "$PSScriptRoot/sdk-replacements.ps1"
 Write-SyTiming phase "$($args[0])/native-load" ([string]$timingWatch.ElapsedMilliseconds)
 $script:TimingScript=$args[0]
 $script:TimingSource=$script:Sy.Native['source']

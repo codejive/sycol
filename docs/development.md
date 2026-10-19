@@ -36,6 +36,7 @@ skips setup and host checks; use the drivers for complete verification.
 | `tests/exec.tcl`, `fixtures/probe.sh`, `fixtures/probe.ps1` | Literal process arguments, stdout trimming, inherited stderr, nonzero exits, capture records, exact line endings, concurrent large streams, and cwd |
 | `tests/files-move.tcl` | Move operations, replacement, failure retention, and cross-filesystem behavior when fixture roots permit it |
 | `tests/native.tcl` | Registered native handler behavior |
+| `tests/sdk-replacements.tcl`, `sdk-replacements.sh`, `sdk-replacements.ps1` | Native/fallback SDK parity and test-side subset selection |
 | `tests/discovery.tcl`, `discovery.sh`, `discovery.ps1` | Copied-installation search paths, optional loading, native precedence, repeated source, overrides, embedding, and startup failures |
 | `tests/encoding.tcl`, `encoding.sh`, `encoding.ps1` | UTF-8/BOM, source line endings, and NUL handling |
 | `tests/launchers.sh`, `launchers.ps1` | Entry points, versions, PATH lookup, arguments, exit propagation, and Windows batch/CMD quoting |
@@ -55,7 +56,10 @@ cost is negligible; explain material costs and a low-cost aligned alternative
 before implementing a departure.
 
 Prefer shared procedures in `.sycol/lib/`; add native code only for evaluator
-mechanisms or required host facilities. Keep Bash and PowerShell equivalent
+mechanisms or required host facilities. Measured equivalent native SDK
+replacements may retain shared definitions as portable fallbacks; the shipped
+core does this for `incr`, `append`, `concat`, and `lappend`.
+Keep Bash and PowerShell equivalent
 in results, completion codes, argument boundaries, and errors. Preserve
 Bash 3.2+ and Windows PowerShell 5.1+ support: avoid newer-host-only features.
 
@@ -83,6 +87,18 @@ After behavioral changes, run `bash tests/run.sh` and available PowerShell
 drivers. Report which runtimes ran, failures, and unavailable runtimes. A newer
 local runtime does not establish minimum-version coverage. Documentation-only
 changes need content/link checks rather than interpreter tests.
+
+## Native SDK differential checks
+
+The test embedding launchers `tests/timed.sh` and `tests/timed.ps1` accept
+`SYCOL_TEST_SDK_NATIVE=fallback`, `scalars`, or `lists` to remove respectively
+all four replacements, only the list pair, or only the scalar pair before SDK
+loading. Leave it unset for all replacements. This is test-side host inspection,
+not a production setting. Run full drivers with `fallback` to exercise the
+actual unchanged Tcl definitions; a same-name `proc` cannot disable natives.
+`tests/sdk-replacements.tcl` runs the same contracts in every selection.
+Discovery checks no Tcl procedures exist at bootstrap, availability before and
+after explicit loading, and later handler replacement.
 
 ## CI
 

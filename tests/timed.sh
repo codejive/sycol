@@ -2,6 +2,7 @@
 # Embedding launcher used only by the tests; normal Sycol has no timer command.
 source tests/timing.sh
 timing_measure phase "$1/native-load" source .sycol/bin/sycol
+source tests/sdk-replacements.sh
 timing_test() {
     if (($#!=2)); then arity 'test.time name script'; return; fi
     timing_measure test "$1" eval_script "$2"

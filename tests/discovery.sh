@@ -108,8 +108,31 @@ printf '%s\n' 'return 1' > "$temp/.sycol/native/unrelated.sh"
 (
     set +e
     source "$temp/.sycol/bin/sycol" || exit 1
-    dispatch incr n
-    [[ $C == 1 ]] || exit 1
+    [[ ${#PN[@]} == 0 ]] || exit 1
+    vget ::sycol_version; [[ $C == 1 ]] || exit 1; C=0
+    eval_script 'set n 1; incr n; append n x; lappend items $n; concat $items'
+    [[ $C == 0 && $R == 2x && ${#PN[@]} == 0 ]] || exit 1
+    load_sdk
+    [[ $C == 0 && ${#PN[@]} -gt 0 ]] || exit 1
+    eval_script 'incr n 0'
+    [[ $C == 1 && $R == 'expected integer: 2x' ]] || exit 1
+    C=0
+    for promoted in incr append concat lappend; do
+        dispatch proc "$promoted" args 'return hidden'
+    done
+    eval_script 'set n 1; incr n; append n x; lappend items z; concat $items'
+    [[ $C == 0 && $R == '2x z' ]] || exit 1
+    eval_script 'set n 0; incr n invalid'
+    [[ $C == 1 && $R == 'expected integer: invalid' ]] || exit 1
+    C=0
+    load_sdk; load_sdk
+    [[ $C == 0 ]] || exit 1
+    replacement() { R=replaced; }
+    for promoted in incr append concat lappend; do
+        sy_register "$promoted" replacement
+        dispatch "$promoted"
+        [[ $C == 0 && $R == replaced ]] || exit 1
+    done
     builtin cd -- "$root" || exit 1
     main "$temp/empty.tcl"
 ) || exit 1

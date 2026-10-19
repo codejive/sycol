@@ -199,8 +199,21 @@ Native handlers always take precedence over Tcl procedures, regardless of
 definition order. Defining a same-name Tcl procedure is legal, but it remains
 hidden. Later native registrations replace earlier native handlers. Backends
 may implement any subset of an SDK module's commands; the remaining commands
-use portable Tcl definitions. No production optimizations are introduced by
-this loading design. There is no retry through Tcl after a native error.
+use portable Tcl definitions. The shipped core accelerates `incr`, `append`,
+`concat`, and `lappend`, retaining their unchanged portable definitions in
+`core.tcl`. There is no retry through Tcl after a native error.
+
+These four commands are available before SDK loading. Sourcing still evaluates
+no Tcl and initializes only search-path globals. Same-name Tcl definitions
+stay hidden; later native registration replaces the handler. Public contracts
+remain stable; internal shared helper calls are not interception hooks. Native
+`incr` uses the arithmetic helper directly and native `concat` need not invoke
+`append`. Actual command invocations in shared code still use dynamic lookup.
+
+Scalar handlers use existing variable and arithmetic helpers in the current
+frame. List handlers decode each input once and use the canonical encoder;
+`lappend` writes only after validation succeeds. No parsed values are cached.
+Repeated single-element appends still process the growing old string.
 
 SDK and native path ordering is independent: they are not paired by index.
 Use compatible distributions across all configured roots. Matching filenames

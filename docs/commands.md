@@ -68,6 +68,8 @@ handler with the same name always wins; the Tcl definition remains hidden.
 
 Add an integer amount (default `1`) to an existing caller variable; return its new
 value. Missing variables and invalid/overflowing arithmetic fail.
+Operands and the result are validated before writing; failures leave the
+existing value unchanged. Signed and leading-zero integers are decimal.
 
 ### **append** _name_ ?_value_ ...?
 
@@ -77,9 +79,10 @@ value. Missing variables and invalid/overflowing arithmetic fail.
 Concatenate values without a separator to a caller variable, creating it if absent;
 return the new value. With no values, read/create the variable.
 
-`set`, `unset`, `global`, and `proc` are native; `incr` and `append` are SDK
-procedures. Variable names must be nonempty. Unqualified names refer only to
-the current frame; leading `::` selects the global frame. See
+`set`, `unset`, `global`, and `proc` are native; `incr` and `append` have native
+implementations with retained SDK fallbacks. Variable names must be nonempty.
+Unqualified names refer only to the current frame; leading `::` selects the
+global frame. See
 [scope and parameters](language.md#variables-and-procedures).
 
 ```tcl
@@ -385,7 +388,8 @@ puts [== 01 1]                  ;# 1: equal decimal integers
 
 ## Lists
 
-`list`, `llength`, and `lindex` are native; the other commands are SDK
+`list`, `llength`, and `lindex` are native; `concat` and `lappend` have native
+implementations with retained SDK fallbacks. The other commands are SDK
 procedures. All list inputs must be valid encoded lists. Returned lists use
 canonical encoding; elements retain their decoded values.
 
@@ -459,12 +463,15 @@ Return a new list with elements reversed.
 Append each value as one element to a caller variable, creating an empty list if
 absent; return the new list. Validate and re-encode its existing value, even with no
 new elements.
+Malformed existing lists fail without changing the variable. Repeated appends
+still validate and reconstruct the growing list string.
 
 ### **concat** ?_list_ ...?
 
 - *list ...*: Zero or more encoded lists to combine by flattening one level.
 
 Flatten one list level and return a canonical list. No arguments returns empty.
+Every input must be a complete valid list; fragments cannot complete each other.
 
 ### **join** _list_ ?_separator_?
 

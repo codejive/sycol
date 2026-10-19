@@ -262,6 +262,7 @@ These commands define the host contracts in this version. `sy.file` is optional
 and becomes available with `source files.tcl`; other listed commands are core. All
 listed argument counts are checked; extra arguments are errors. Commands that
 do not return a meaningful value return the empty string.
+Section 7 also identifies accelerated SDK contracts with shared fallbacks.
 
 | Command | Behavior |
 | --- | --- |
@@ -430,6 +431,21 @@ The launcher loads only `.sycol/lib/core.tcl`. The optional `files.tcl`
 module combines filesystem dispatch with lexical path helpers and loads via
 `source files.tcl`. Core's shared procedures remain portable Tcl; native
 handlers can supply equivalent implementations without changing SDK definitions.
+The shipped core backends accelerate `incr`, `append`, `concat`, and `lappend`,
+retaining their unchanged shared definitions as portable fallbacks. These are
+equivalent SDK replacements, not new language primitives. They are available
+when sourcing the interpreter before SDK loading, without evaluating Tcl or
+initializing script startup globals. Missing-variable `incr` remains an error;
+`concat` validates every input, and zero-value `lappend` validates and
+canonicalizes its old value without mutating on failure.
+
+Native-first dispatch applies to these names: a same-name Tcl `proc` is legal
+but hidden, and later native registration replaces the handler. Public
+contracts remain stable; internal shared helper calls are not extension hooks.
+Native `incr` need not dispatch through `+`, nor native `concat` through
+`append`. Commands actually invoked in shared code still resolve dynamically.
+Repeated `lappend` validates and reconstructs the growing string and is not
+constant time per append.
 The `file` entries below require the optional module.
 
 | Procedure | Contract |
@@ -705,8 +721,8 @@ Native handlers always take precedence over Tcl procedures, regardless of
 definition order. Defining a same-name Tcl procedure is legal, but it remains
 hidden. Later native registrations replace earlier native handlers. Backends
 may implement any subset of an SDK module's commands; the remaining commands
-use portable Tcl definitions. No production optimizations are introduced by
-this loading design. There is no retry through Tcl after a native error.
+use portable Tcl definitions, including the retained fallbacks described in
+section 7. There is no retry through Tcl after a native error.
 
 SDK and native path ordering is independent: they are not paired by index.
 Use compatible distributions across all configured roots. Matching filenames
@@ -848,6 +864,8 @@ Any language or SDK extension must update this spec, add shared Tcl tests,
 and work on both hosts. Prefer a Tcl procedure whenever the existing native
 contracts suffice. Add a native primitive only for a required host facility,
 an evaluator mechanism, or an operation impossible in the current subset.
+Equivalent native replacements of SDK commands are also permitted when
+representative measurements justify them and portable definitions remain.
 Keep optional application commands in separate sourced Tcl files or trusted
 native launchers.
 

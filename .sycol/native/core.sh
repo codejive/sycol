@@ -1,5 +1,50 @@
 # Bootstrap native handlers; no Sycol code runs during registration.
 
+# Equivalent SDK replacements; core.tcl retains the portable definitions.
+# Register first so existing natives retain their reverse lookup distances.
+sy_cmd_incr() {
+    if (($#<1 || $#>2)); then arity 'procedure arguments'; return; fi
+    local value
+    vget "$1"; ((C)) && return; value=$R
+    sy_cmd_math '+' "$value" "${2-1}"; ((C)) && return
+    vset "$1" "$R"
+}
+sy_register 'incr' sy_cmd_incr
+
+sy_cmd_append() {
+    if (($#<1)); then arity 'procedure arguments'; return; fi
+    local name=$1 value part; shift
+    vget "$name"
+    if ((C)); then C=0; RC=0; RL=0; value=; else value=$R; fi
+    for part in "$@"; do value+=$part; done
+    vset "$name" "$value"
+}
+sy_register 'append' sy_cmd_append
+
+sy_cmd_concat() {
+    local part
+    local -a ITEMS=() values=()
+    for part in "$@"; do
+        parse_list "$part"; ((C)) && return
+        values+=("${ITEMS[@]}")
+    done
+    quote_list "${values[@]}"
+}
+sy_register 'concat' sy_cmd_concat
+
+sy_cmd_lappend() {
+    if (($#<1)); then arity 'procedure arguments'; return; fi
+    local name=$1 value; shift
+    local -a ITEMS=() values=()
+    vget "$name"
+    if ((C)); then C=0; RC=0; RL=0; value=; else value=$R; fi
+    parse_list "$value"; ((C)) && return
+    values=("${ITEMS[@]}" "$@")
+    quote_list "${values[@]}"
+    vset "$name" "$R"
+}
+sy_register 'lappend' sy_cmd_lappend
+
 sy_cmd_set() {
     case $# in 1) vget "$1";; 2) vset "$1" "$2";; *) arity 'set name ?value?';; esac
 }

@@ -225,7 +225,10 @@ finish_return() {
 invoke_proc() {
     local idx=$1; shift
     local old=$F frame i n arg value variadic=0
-    local -a formals=() names=() defaults=() optional=() actual=("$@") ITEMS=()
+    local -a formals=() names=() defaults=() optional=() actual=() ITEMS=()
+    # Git Bash can strip CR from CRLF in a local compound assignment.
+    # Assign separately to preserve literal procedure argument boundaries.
+    actual=("$@")
     parse_list "${PA[idx]}"; ((C)) && return; formals=("${ITEMS[@]}")
     for arg in "${formals[@]}"; do
         parse_list "$arg"; ((C)) && return

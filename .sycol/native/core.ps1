@@ -7,6 +7,52 @@ Register-SyNative 'set' {
     else { Set-SyArity 'set name ?value?' }
 }
 
+# Equivalent SDK replacements; core.tcl retains the portable definitions.
+Register-SyNative 'incr' {
+    param([string[]]$a)
+    if ($a.Count -lt 1 -or $a.Count -gt 2) { Set-SyArity 'procedure arguments'; return }
+    Get-SyVariable $a[0]; if ($script:Sy.C) { return }; $value=$script:Sy.R
+    $amount='1'; if ($a.Count -eq 2) { $amount=$a[1] }
+    Invoke-SyNativeMath '+' @($value,$amount); if ($script:Sy.C) { return }
+    Set-SyVariable $a[0] $script:Sy.R
+}
+
+Register-SyNative 'append' {
+    param([string[]]$a)
+    if (!$a.Count) { Set-SyArity 'procedure arguments'; return }
+    Get-SyVariable $a[0]
+    $value=''
+    if ($script:Sy.C) { $script:Sy.C=0; $script:Sy.RC=0; $script:Sy.RL=0 } else { $value=$script:Sy.R }
+    $text=New-Object Text.StringBuilder
+    [void]$text.Append($value)
+    for ($i=1; $i -lt $a.Count; $i++) { [void]$text.Append($a[$i]) }
+    Set-SyVariable $a[0] ($text.ToString())
+}
+
+Register-SyNative 'concat' {
+    param([string[]]$a)
+    $values=New-Object 'Collections.Generic.List[string]'
+    foreach ($part in $a) {
+        $items=ConvertFrom-SyList $part; if ($script:Sy.C) { return }
+        $values.AddRange([string[]]$items)
+    }
+    ConvertTo-SyList ($values.ToArray())
+}
+
+Register-SyNative 'lappend' {
+    param([string[]]$a)
+    if (!$a.Count) { Set-SyArity 'procedure arguments'; return }
+    Get-SyVariable $a[0]
+    $value=''
+    if ($script:Sy.C) { $script:Sy.C=0; $script:Sy.RC=0; $script:Sy.RL=0 } else { $value=$script:Sy.R }
+    $items=ConvertFrom-SyList $value; if ($script:Sy.C) { return }
+    $values=New-Object 'Collections.Generic.List[string]'
+    $values.AddRange([string[]]$items)
+    for ($i=1; $i -lt $a.Count; $i++) { $values.Add($a[$i]) }
+    ConvertTo-SyList ($values.ToArray())
+    Set-SyVariable $a[0] $script:Sy.R
+}
+
 Register-SyNative 'unset' {
     param([string[]]$a)
     $n=$a.Count
