@@ -25,7 +25,7 @@ if ! cmp -s .sycol/VERSION "$temp/version"; then
     exit 1
 fi
 {
-    find .sycol examples -type f
+    find .sycol examples docs -type f
     printf '%s\n' sycol sycol.bat LICENSE README.md RELEASE.md SPEC.md
 } | sort > "$temp/expected"
 sed "s|^|$prefix|" "$temp/expected" > "$temp/entries"

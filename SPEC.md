@@ -756,7 +756,8 @@ greater than 25%; zero baseline durations and missing entries are skipped.
 Expected maximum durations are explicitly configured per measurement. Baselines
 must match host, runtime version/executable, machine, OS, architecture, locale,
 clock, and symbolic-link test availability; otherwise comparison is skipped.
-See [README.md](README.md) for configuration variables and examples.
+See [testing and development](docs/development.md#timing-reports) for
+configuration variables and examples.
 
 Both drivers write UTF-8, LF-terminated TSV records with three fields and no
 embedded tabs/newlines: `meta KEY VALUE` identifies format `sycol-timing-v1` and

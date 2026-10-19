@@ -4,7 +4,7 @@
   clearly without making commit messages overly verbose.
 - Read [SPEC.md](SPEC.md) before changing behavior; it defines the language,
   SDK, compatibility boundaries, and extension contracts. See [README.md](README.md)
-  for usage and test commands.
+  for a quick start and [docs/development.md](docs/development.md) for test commands.
 - Keep the core tiny. Prefer shared Tcl procedures in `.sycol/sdk/` over new
   native commands. Preserve file-only execution, explicit `exec`, and no infix
   expression parser unless the requested change explicitly revises that design.
@@ -28,6 +28,9 @@
   contract changes, and add meaningful tests. Update usage examples when needed.
   Clarify material ambiguity or compatibility breaks before dependent work;
   otherwise proceed using the existing design.
+- When adding or changing commands, update [docs/commands.md](docs/commands.md)
+  and any affected guides in `docs/` in the same change. Document parameters,
+  options, return values, errors, and examples as applicable.
 - Run `bash tests/run.sh` and `powershell` / `pwsh -NoProfile -File tests/run.ps1`
   on available supported hosts. Report what ran, failures, and unavailable
   runtimes; do not claim minimum-version or CI coverage passed without evidence.

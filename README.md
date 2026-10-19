@@ -23,239 +23,32 @@ puts "total: $total"
 puts [exec git --version]
 ```
 
-Capture a process's status, stdout, and stderr as a three-element list:
-
-```tcl
-lassign [exec -capture -- git status --short] status stdout stderr
-puts "status: $status"
-puts -nonewline $stdout
-puts -nonewline $stderr
-```
-
-`-capture` returns normally even for a nonzero child exit and preserves all
-trailing newlines in both streams. Launch and capture failures remain errors.
-Plain `exec` streams stderr, raises an error on nonzero exit, and removes one
-final newline from stdout. Bash capture requires `mktemp`, `cat`, `rm`, and
-`rmdir`; it stores output in private temporary files while the child runs.
-
-Lists support assignment, slicing, insertion, replacement, and reversal:
-
-```tcl
-set items {a b c d}
-puts [lindex $items end]          ;# d
-puts [lrange $items 1 end-1]      ;# b c
-set items [linsert $items end e]  ;# a b c d e
-set items [lreplace $items 1 2 x] ;# a x d e
-puts [lreverse $items]           ;# e d x a
-```
-
-`lassign` sets missing values to empty strings and returns any unassigned
-elements. List indices accept decimal integers, `end`, `end-N`, `end+N`,
-and a single decimal addition or subtraction such as `1+2`.
-
-List, inspect, copy, and delete filesystem entries using literal paths:
-
-```tcl
-foreach name [file list .] { puts "$name: [file type $name]" }
-set output [file join build backup]
-file mkdir [file dirname $output]
-file copy source-dir backup-dir
-file rename backup-dir $output
-if [file isfile [file join $output notes.txt]] {
-    puts "notes: [file size [file join $output notes.txt]] bytes"
-}
-file delete -force $output
-exit 0
-```
-
-Copying directories is recursive and preserves supported attributes by default.
-An existing target directory receives each source under its basename; overwriting
-an existing file requires `-force`. Copy, rename, and delete accept multiple paths.
-Rename supports cross-filesystem moves by copying and then deleting the source
-after a successful copy; these moves are not atomic.
-`file pathtype $path` returns `absolute`, `relative`, or `volumerelative` using
-the host's path rules, without requiring the path to exist. On Windows,
-`C:data` and `/data` are volume-relative; `C:/data` is absolute.
-Deleting a missing path succeeds; deleting a nonempty directory needs `-force`.
-`exit` defaults to 0, accepts statuses 0–255, and terminates immediately even
-inside `catch`. Bash uses standard `cp`, `mv`, `mkdir`, `rm`, `rmdir`, `chmod`, and `stat` utilities;
-PowerShell on Unix also uses `stat` and `chmod` for file types and permissions.
-
-Run a file (paths are relative to the current working directory):
-
-```sh
-./sycol examples/hello.tcl Alice 'Bob Smith'
-```
-
-```powershell
-& ./.sycol/bin/sycol.ps1 examples/hello.tcl Alice 'Bob Smith'
-```
-
-From CMD:
-
-```bat
-sycol examples/hello.tcl Alice "Bob Smith"
-```
+## Run
 
 Targets: **Bash 3.2+** with 64-bit shell arithmetic, and **Windows PowerShell
-5.1+ / PowerShell 7+**. There is no REPL, stdin script mode, or `-c` mode.
-If local Windows policy prevents running an unsigned script, use your normal
-script-signing workflow or launch it with
-`powershell -NoProfile -ExecutionPolicy Bypass -File .sycol/bin/sycol.ps1 ...`.
+5.1+ / PowerShell 7+**. Save scripts as UTF-8. Run a file from the project root:
 
-Add `.sycol/bin/` to `PATH` to run `sycol script.tcl [args ...]` directly.
-Bash selects the executable `sycol`, PowerShell on Windows selects `sycol.ps1`,
-and CMD selects `sycol.bat`. PowerShell users can specify `sycol.ps1` explicitly
-to bypass CMD argument parsing. The root `sycol` and `sycol.bat` wrappers
-provide project-local invocation without changing `PATH`.
+| Shell | Command |
+| --- | --- |
+| Bash | `./sycol examples/hello.tcl Alice 'Bob Smith'` |
+| PowerShell | `& ./.sycol/bin/sycol.ps1 examples/hello.tcl Alice 'Bob Smith'` |
+| CMD | `sycol examples/hello.tcl Alice "Bob Smith"` |
 
-Query the Sycol release with `./sycol --version`, `sycol.bat --version`, or
-`& ./.sycol/bin/sycol.ps1 --version`. Each prints just the version and a newline.
-Inside a Tcl script or procedure, use `puts $::sycol_version`.
-The single `.sycol/VERSION` file, initially `0.1.0`, stores the runtime version;
-keep it with the distribution when copying Sycol into another project.
-Maintainers publish releases through the manually triggered GitHub Actions
-workflow, supplying an explicit version. See [the release process](RELEASE.md).
+Paths resolve from the current working directory. There is no REPL, stdin
+script mode, or `-c` mode. Add `.sycol/bin/` to `PATH` for direct invocation,
+or copy the two root wrappers and the entire `.sycol/` directory into your
+project. See [running scripts](docs/running.md) for installation, version
+queries, Windows execution policy, and argument quoting.
 
-Copy the two root wrappers and the entire `.sycol/` directory into your project:
+## Documentation
 
-```text
-sycol
-sycol.bat
-.sycol/
-  VERSION
-  bin/
-    sycol
-    sycol.ps1
-    sycol.bat
-  native/
-    core.sh
-    core.ps1
-  sdk/
-    control.tcl
-    lists.tcl
-    strings.tcl
-    variables.tcl
-```
+Start with the [documentation guide](docs/README.md), or go directly to:
 
-Launchers find the runtime relative to themselves and preserve the working
-directory and exit status. The batch launcher uses Windows PowerShell with
-`-NoProfile -ExecutionPolicy Bypass` for that process.
+- [Language basics](docs/language.md): Tcl syntax, values, procedures, and errors.
+- [Command reference](docs/commands.md): every supported command, parameters, and results.
+- [Testing and development](docs/development.md): tests, timings, benchmarks, and contributions.
+- [Implementation](docs/implementation.md): project structure, backends, embedding, and extensions.
+- [Tcl compatibility](docs/tcl-compatibility.md): supported subset and deliberate differences.
 
-CMD still applies its own syntax before a launcher receives arguments. Quote
-spaces and metacharacters, use `""` for an empty argument, and disable delayed
-expansion when passing literal `!`. Windows PowerShell's command-line parser
-also requires `\"` for a literal quote and doubled trailing backslashes before
-a closing quote. For example, from an interactive CMD prompt with delayed
-expansion off:
-
-```bat
-sycol scripts/build.tcl "" "two words" "say \"hello\"" "C:\some path\\" "a&b"
-```
-
-CMD expands `%NAME%` before launching; inside a calling batch file, literal
-percent signs need `%%`. The wrappers do not use `CALL` or re-expand arguments
-with delayed expansion. Combining literal quotes with CMD metacharacters in
-one argument requires escaping for each batch parsing pass; `\"` alone does
-not protect an `&` inside those literal quotes. For such arguments, invoke the
-`.ps1` entry point directly from PowerShell.
-
-Each interpreter automatically loads direct native files for its host (`.sh`
-or `.ps1`), then loads all direct SDK `.tcl` files before running your script.
-Use lowercase ASCII filenames; files load alphabetically, independently of
-the current locale. Dot-prefixed files and subdirectories are ignored.
-Native files define helpers and register commands; SDK files define procedures.
-Neither should invoke commands that require another library file during loading.
-Adding a file needs no launcher change. Scripts can also `source` additional
-Tcl files to extend the SDK for one application.
-Save all `.tcl` source files as UTF-8 (an optional UTF-8 BOM is accepted).
-The runtime assumes UTF-8 without validating it; other encodings are unsupported.
-See [the complete language and SDK specification](SPEC.md), including native
-extension examples, supported syntax, and deliberate Tcl differences.
-
-Run the tests from any directory:
-
-```sh
-bash tests/run.sh
-# To select a particular Bash version:
-SYCOL_BASH=/bin/bash /bin/bash tests/run.sh
-```
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tests/run.ps1
-pwsh -NoProfile -File tests/run.ps1
-```
-
-Each driver runs the shared Tcl suite, process tests, library discovery, and
-launcher tests in its own host. On Windows these include both batch entry
-points and CMD quoting, PATH lookup, and exit status propagation.
-Tests return a nonzero process status on failure and use an isolated temporary
-directory for generated files. CI covers macOS `/bin/bash` (the Bash 3.2
-target), current Linux Bash, Windows PowerShell, and PowerShell on Windows and
-Linux. CI configuration is included; running CI requires a hosted repository.
-
-Each run also prints total suite time, the number of timed named tests, the ten
-slowest tests, separate native/SDK module-loading measurements, and timings for
-the shared, filesystem-move, native-extension, process, discovery, encoding, and
-launcher groups. Named Tcl test timings cover the body, including expected
-errors, and exclude assertion/reporting overhead. Host-only probes are measured
-as groups. `phase/startup` measures a fresh process executing an empty workload,
-including interpreter initialization and SDK loading. Group timings include
-child-process startup; module timings exclude process creation. These overlapping
-measurements must not be added together.
-
-The drivers save UTF-8 TSV results to `.test-tmp/timings-bash.tsv` or
-`.test-tmp/timings-powershell.tsv`, including partial results and exit status on
-test failure. Set `SYCOL_TIMING_OUTPUT` to choose another file in an existing
-directory. Timings use Bash's built-in `time` and PowerShell's `Stopwatch`, with
-integer millisecond output and no additional language dependency. Bash elapsed
-time is not guaranteed monotonic; very short tests can round to zero. The
-test-only launchers register the internal `test.time name script` helper;
-normal Sycol has no timing command.
-
-To compare runs, save a result as a baseline and select it on a later run:
-
-```sh
-cp .test-tmp/timings-bash.tsv .test-tmp/baseline-bash.tsv
-SYCOL_TIMING_BASELINE=.test-tmp/baseline-bash.tsv bash tests/run.sh
-```
-
-```powershell
-Copy-Item .test-tmp/timings-powershell.tsv .test-tmp/baseline-powershell.tsv
-$env:SYCOL_TIMING_BASELINE='.test-tmp/baseline-powershell.tsv'
-pwsh -NoProfile -File tests/run.ps1
-```
-
-Comparison requires matching host, runtime version and executable, machine,
-OS, architecture, locale, clock, and symbolic-link fixture availability.
-Mismatches are reported and skipped. Preserve separate baselines for Windows
-PowerShell and PowerShell 7. A regression warning requires an increase strictly
-greater than **both 100 ms and 25%** by default. Override these with
-`SYCOL_TIMING_REGRESSION_MS` and `SYCOL_TIMING_REGRESSION_PERCENT` (nonnegative
-integers). Zero-duration baseline entries have no meaningful percentage and
-are skipped. Missing baseline tests are skipped too.
-
-Set `SYCOL_TIMING_EXPECTED` to a UTF-8 file containing an exact measurement key,
-a tab, and an explicitly expected maximum duration in integer milliseconds:
-
-```text
-# The separator below is a literal tab.
-test/exec-capture	10000
-group/discovery	5000
-```
-
-Keys use `test/NAME`, `phase/NAME`, `group/NAME`, or `suite/total`; copy exact
-names from the result file. Blank lines and `#` comments are allowed. All paths
-resolve from the repository root. Timing warnings are informational and never
-change test exit status; invalid configuration or unreadable files are errors.
-The two regression settings and duration values accept at most nine digits.
-
-For optional timings (file reading, SDK file/path operations, startup, parsing,
-and list encoding), run
-`bash tests/benchmark.sh` or `powershell` / `pwsh -NoProfile -File tests/benchmark.ps1`.
-To compare another installation, pass its interpreter file as the first Bash
-argument or PowerShell's `-Runtime` argument. Timings depend on the host and
-locale; the benchmarks are not pass/fail performance tests.
-
-Sycol scripts have the same filesystem and process access as their host shell.
-Run trusted scripts.
+The [specification](SPEC.md) defines the formal contract;
+the [release guide](RELEASE.md) documents publishing.

@@ -29,6 +29,8 @@ assemble:
             - SPEC.md
         - input: examples
           output: examples
+        - input: docs
+          output: docs
 
 release:
   github:

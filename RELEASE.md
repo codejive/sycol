@@ -41,11 +41,12 @@ Each release contains:
 - `checksums_sha256.txt`
 
 Both archives contain a `sycol-VERSION/` directory with the two root wrappers,
-the complete `.sycol/` runtime and SDK, license, README, release guide, specification, and
-examples. The same archive works on every supported platform; add its
-`.sycol/bin/` directory to `PATH` or copy the runtime and wrappers into your
-project as described in the README. TGZ preserves the Bash launchers' executable
-bits; ZIP also records them, though extraction tools may ignore those bits.
+the complete `.sycol/` runtime and SDK, license, README, release guide,
+specification, `docs/` guides, and examples. The same archive works on every
+supported platform; add its `.sycol/bin/` directory to `PATH` or copy the runtime
+and wrappers into your project as described in the README. TGZ preserves the
+Bash launchers' executable bits; ZIP also records them, though extraction tools
+may ignore those bits.
 
 Release notes are generated from Conventional Commits since the previous tag.
 The runtime version, tag, archive names, and JReleaser project version all derive
