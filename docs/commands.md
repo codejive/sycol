@@ -3,7 +3,8 @@
 [Documentation](README.md) · [Language basics](language.md) · [Tcl compatibility](tcl-compatibility.md)
 
 This reference covers every application command in a normal installation,
-including automatic `core.tcl` and optional `files.tcl` (`source files.tcl`).
+including automatic `core.tcl` and optional `files.tcl` and `dict.tcl` modules
+(loaded with `source files.tcl` and `source dict.tcl`).
 Native commands and shared Tcl procedures have the same calling syntax.
 Internal `sy.*` helpers are listed in
 the [implementation guide](implementation.md#internal-command-reference).
@@ -22,6 +23,7 @@ completions propagate unless the command explicitly handles them.
 - [Arithmetic and comparison](#arithmetic-and-comparison)
 - [Strings](#strings)
 - [Lists](#lists)
+- [Dictionaries](#dictionaries)
 - [Text I/O and environment](#text-io-and-environment)
 - [External processes](#external-processes)
 - [Filesystem and paths](#filesystem-and-paths)
@@ -503,6 +505,88 @@ set items [lreplace $items 1 2 x] ;# a x d e
 puts [lreverse $items]           ;# e d x a
 lassign $items first second
 puts [join [list $first $second] ,] ;# a,x
+```
+
+## Dictionaries
+
+Load `source dict.tcl`. All operations are shared SDK procedures, with no
+native dictionary backend. Dictionaries are string values containing an
+even-length list of alternating keys and values. Empty keys/values are valid;
+keys are case-sensitive. Duplicate keys use their last value and retain their
+first position. Updating a key keeps its position; adding a key appends it.
+Removing and reinserting a key moves it to the end.
+
+### **dict create** ?_key value ..._?
+
+Return a dictionary from the supplied pairs, or empty with no arguments.
+An unpaired key is an error.
+
+### **dict get** _dictionaryValue_ ?_key ..._?
+
+Return the value at the given key path. Pass each key as a separate argument;
+`{a b}` denotes one key containing a space, not two nested keys. With no keys,
+return all distinct key/value pairs. Missing keys, malformed lists, and
+odd-length dictionaries along the path are errors. Leaf values are opaque
+strings and need not themselves be dictionaries.
+
+### **dict exists** _dictionaryValue key_ ?_key ..._?
+
+Return `1` when retrieving that path would succeed, otherwise `0`. Missing keys
+and malformed dictionaries along the path return `0`, following Tcl 8.6.
+At least one key is required.
+
+### **dict set** _dictionaryVariable key_ ?_key ..._? _value_
+
+Update the dictionary in the named caller variable, creating the variable and
+missing intermediate dictionaries as needed. Return the entire updated
+dictionary. An existing malformed dictionary on the path is an error.
+
+### **dict unset** _dictionaryVariable key_ ?_key ..._?
+
+Remove the final key, store the result in the named caller variable, and
+return the entire updated dictionary. An absent final key is allowed;
+missing intermediate keys and malformed dictionaries are errors. Empty parent
+dictionaries remain present. A missing variable is treated as empty, so
+single-key `unset` creates an empty variable; a missing intermediate key fails
+without creating the variable.
+
+Both mutations accept ordinary variable names, `::` globals, and global
+aliases; empty variable names fail. Validation errors leave the variable
+unchanged. Variable names are passed literally, without `$`; read operations
+take dictionary values. Copies remain independent after mutation.
+
+### **dict keys** _dictionaryValue_
+
+Return a list of distinct keys in insertion order. Tcl's optional glob pattern
+is unsupported: Sycol has no glob API, and pattern matching is deferred to keep
+this initial subset small.
+
+### **dict size** _dictionaryValue_
+
+Return the number of distinct keys. Both `keys` and `size` reject malformed
+lists and odd-length dictionaries.
+
+Only these seven subcommands are supported. Unambiguous Tcl 8.6 abbreviations
+work (`c`, `g`, `e`, `k`, `se`, `si`, `un`); ambiguous prefixes such as `s` and
+`u` are errors, including ambiguity with unsupported Tcl operations. Other
+Tcl `dict` operations are errors. Argument-count errors are catchable. Returned
+dictionaries use Sycol's canonical list encoding; compare decoded entries when
+input spelling is irrelevant. Scans can repeatedly parse lists, and mutations
+rebuild strings; lookup and update are not guaranteed constant time.
+
+```tcl
+source dict.tcl
+set config [dict create host localhost port 8080]
+puts [dict get $config host]       ;# localhost
+puts [dict exists $config tls]     ;# 0
+dict set config port 9000
+dict set config tls enabled 1
+puts [dict get $config tls enabled] ;# 1
+set copy $config
+dict unset copy port
+puts [dict exists $config port]    ;# 1
+puts [dict keys $copy]             ;# host tls
+puts [dict size $copy]             ;# 2
 ```
 
 ## Text I/O and environment

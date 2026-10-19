@@ -50,6 +50,7 @@ part of Sycol's design rather than an incomplete `expr` parser.
 | List indices | Decimal integers, `end`, `end+N`, `end-N`, and one decimal addition/subtraction. No general expressions. |
 | `string` | Only `length`, `equal`, `range`; full subcommand spelling, no options. `range` accepts decimal bounds, without `end`. |
 | `concat` | Parses lists, flattens one level, and returns canonical list encoding. Do not rely on preserving the original whitespace/spelling. |
+| `dict` | Optional `source dict.tcl`; only `create`, `get`, `exists`, `set`, `unset`, `keys`, `size`, with unambiguous Tcl 8.6 abbreviations. Nested key paths are supported; `keys` has no glob pattern. String/list representation only, without native hash tables or constant-time lookup guarantees. |
 | `{*}` word expansion | Unsupported; use `apply command argumentList`. |
 | `return` | Numeric `-code 0..4`, `-level 0..128`, optional value; no symbolic codes or `-options`. |
 | `catch` options | A four-element list `-code CODE -level LEVEL`, not a detailed Tcl options dictionary. |
@@ -126,7 +127,7 @@ the CRT conventions used by the PowerShell backend.
 
 ## Facilities outside the subset
 
-Sycol has no Tcl arrays, dictionaries, namespaces, packages, regex/glob APIs,
+Sycol has no Tcl arrays, namespaces, packages, regex/glob APIs,
 channels, sockets, event loop, coroutines, traces, byte arrays, Unicode escape
 sequences, command introspection, or `info` commands. Native extensions can
 provide application-specific host facilities; shared Tcl procedures should be

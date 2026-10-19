@@ -133,11 +133,13 @@ normalizes CRLF to LF. Encoding is assumed rather than validated; malformed
 UTF-8 and other encodings are unsupported, and NUL in text files is an error.
 
 Sycol loads only the native core and `core.tcl` automatically. Load optional
-filesystem/path operations explicitly:
+filesystem/path and dictionary operations explicitly:
 
 ```tcl
 source files.tcl
 puts [file exists notes.txt]
+source dict.tcl
+puts [dict get [dict create host localhost] host]
 ```
 
 Use `source ./local.tcl` for a cwd-relative file. Other relative names search

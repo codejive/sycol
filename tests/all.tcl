@@ -206,6 +206,7 @@ test arity-errors {
 
 source ./tests/parser.tcl
 source ./tests/lists.tcl
+source ./tests/dict.tcl
 source ./tests/sdk-replacements.tcl
 source ./tests/files.tcl
 source ./tests/paths.tcl

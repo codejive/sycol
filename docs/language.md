@@ -135,7 +135,9 @@ error may already have changed variables or files.
 
 `set name value` creates or replaces a variable; `set name` reads it.
 `unset name` removes it. Names must be nonempty. Use `${...}` to substitute
-names containing spaces. Sycol has no arrays or dictionaries.
+names containing spaces. Sycol has no Tcl arrays. Load `source dict.tcl` for
+string-valued dictionaries mapping keys to values; see
+[dictionary commands](commands.md#dictionaries).
 
 `proc name parameters body` defines a globally available command. Each call
 has local variables. A parameter is a name or a `{name default}` pair; defaults

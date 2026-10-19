@@ -429,8 +429,10 @@ export environment variables.
 
 The launcher loads only `.sycol/lib/core.tcl`. The optional `files.tcl`
 module combines filesystem dispatch with lexical path helpers and loads via
-`source files.tcl`. Core's shared procedures remain portable Tcl; native
-handlers can supply equivalent implementations without changing SDK definitions.
+`source files.tcl`. The optional `dict.tcl` module provides dictionaries via
+`source dict.tcl`, entirely in shared Tcl. Core's shared procedures remain
+portable Tcl; native handlers can supply equivalent implementations without
+changing SDK definitions.
 The shipped core backends accelerate `incr`, `append`, `concat`, and `lappend`,
 retaining their unchanged shared definitions as portable fallbacks. These are
 equivalent SDK replacements, not new language primitives. They are available
@@ -598,6 +600,59 @@ the existing variable rules (including `::` globals), without Tcl array support.
 The internal shared helper `sy.list.index index length` resolves index notation;
 native `lindex` uses it for non-integer indices after SDK loading.
 
+### Dictionaries
+
+Load `source dict.tcl` before using `dict`. This optional SDK module has no
+native backend, cache, or additional value type. A dictionary is an ordinary
+string parsed as an even-length list of alternating keys and values. Empty
+strings are valid keys and values; keys compare exactly and case-sensitively.
+
+| Command | Contract |
+| --- | --- |
+| `dict create ?key value ...?` | Return a dictionary, empty with no pairs; an unpaired key is an error |
+| `dict get dictionaryValue ?key ...?` | Return the value at a nested key path; with no keys return all distinct key/value pairs; missing keys are errors |
+| `dict exists dictionaryValue key ?key ...?` | Return 1 when the path can be retrieved, otherwise 0, including malformed dictionaries on that path |
+| `dict set dictionaryVariable key ?key ...? value` | Create/update a caller variable and nested path; return the entire updated dictionary |
+| `dict unset dictionaryVariable key ?key ...?` | Remove the final key from a caller variable; return the entire updated dictionary |
+| `dict keys dictionaryValue` | Return distinct keys in insertion order; no pattern option |
+| `dict size dictionaryValue` | Return the number of distinct keys |
+
+Duplicate keys retain their first position and use their last value. Updating
+an existing key preserves its position; new keys append, and removed keys
+disappear from the order. Removing and reinserting a key appends it. Returned
+dictionaries use the portable canonical list encoding; applications must not
+depend on preserving input whitespace or duplicate pairs. Read operations
+do not change their input variables. Assignment copies remain independent.
+
+Key paths are separate arguments, not a single list of keys. Only dictionaries
+traversed by the path are validated: a leaf value can be any string. `set`
+creates missing variables and intermediate dictionaries. `unset` allows an
+absent final key, but missing intermediate keys are errors; empty parent
+dictionaries are retained. A missing variable is treated as an empty dictionary
+by either mutation, so a single-key `unset` creates an empty variable. Mutations
+write the caller variable only after successful validation and reconstruction;
+errors leave its prior value (or absence) unchanged. Names follow ordinary
+variable rules, including `::` and global aliases; empty names are errors.
+
+Except for `exists`, malformed lists and odd-length dictionaries encountered
+by an operation are errors. Other errors include missing required arguments,
+extra arguments, and unsupported operations. Only the seven subcommands above
+are supported, including their unambiguous Tcl 8.6 abbreviations (such as `g`,
+`se`, `si`, and `un`). Prefixes ambiguous in full Tcl, including `s` and `u`,
+are errors even when another matching operation is outside this subset.
+Pattern filtering, other Tcl `dict` operations, and Tcl arrays are outside this
+subset. List parsing and rebuilding
+can repeat during scans; there is no constant-time lookup/update guarantee.
+
+```tcl
+source dict.tcl
+set config [dict create host localhost port 8080]
+dict set config tls enabled 1
+puts [dict get $config tls enabled] ;# 1
+dict unset config port
+puts [dict keys $config]           ;# host tls
+```
+
 ### Control procedures
 
 `foreach` and `for` return empty on normal termination. Loop variables persist
@@ -641,7 +696,8 @@ success; PowerShell loading errors are fatal.
 
 Only `core.tcl` loads automatically. It contains loops, list operations,
 string helpers, and variable helpers. Filesystem commands and their lexical
-path helpers require `source files.tcl`. Native core commands such as
+path helpers require `source files.tcl`; dictionary operations require
+`source dict.tcl`. Native core commands such as
 `source`, `readfile`, `writefile`, `pwd`, and `cd` remain available at bootstrap.
 There is no directory scan or automatic command/package loading.
 
@@ -790,7 +846,7 @@ units (Bash locale characters or bytes, PowerShell UTF-16 code units). Programs
 requiring portable non-ASCII indexing must provide an extension. Text values
 are otherwise passed without intentional case conversion or normalization.
 
-There are no Tcl arrays, dictionaries, namespaces, packages, regex/glob APIs,
+There are no Tcl arrays, namespaces, packages, regex/glob APIs,
 channels, sockets, event loop, coroutines, traces, byte arrays, Unicode escape
 sequences, integer bignums, floats, command introspection, or Tcl `info` commands.
 Detailed Tcl error dictionaries and stack traces are not implemented. Error
@@ -872,5 +928,6 @@ native launchers.
 The parsing and completion design draws on the official
 [Tcl language syntax](https://www.tcl-lang.org/man/tcl8.6/TclCmd/Tcl.htm),
 [Tcl return semantics](https://www.tcl-lang.org/man/tcl8.6/TclCmd/return.htm),
+[Tcl dictionaries](https://www.tcl-lang.org/man/tcl8.6/TclCmd/dict.htm),
 and the [Bash indexed-array interface](https://www.gnu.org/software/bash/manual/html_node/Arrays.html).
 The explicit differences in this specification take precedence over Tcl behavior.

@@ -14,6 +14,7 @@
 | `.sycol/native/core.sh`, `core.ps1` | Native variable, evaluation, control, list, string, arithmetic, text, and process handlers |
 | `.sycol/native/files.sh`, `files.ps1` | Native filesystem operations behind `sy.file` |
 | `.sycol/lib/core.tcl` | Loops, list operations, string/variable helpers, and index resolution |
+| `.sycol/lib/dict.tcl` | Optional dictionary operations in shared Tcl, with nested paths and ordered keys |
 | `.sycol/lib/files.tcl` | Optional filesystem dispatch and lexical path helpers |
 | `examples/hello.tcl` | Runnable example |
 | `tests/` | Shared Tcl conformance cases, host probes, timing helpers, benchmarks, and archive verification |
@@ -161,7 +162,8 @@ may additionally write diagnostics to stderr.
 
 Only `core.tcl` loads automatically. It contains loops, list operations,
 string helpers, and variable helpers. Filesystem commands and their lexical
-path helpers require `source files.tcl`. Native core commands such as
+path helpers require `source files.tcl`; dictionary operations require
+`source dict.tcl`. Native core commands such as
 `source`, `readfile`, `writefile`, `pwd`, and `cd` remain available at bootstrap.
 There is no directory scan or automatic command/package loading.
 
@@ -385,10 +387,17 @@ multi-path iteration, and cross-platform path helper dispatch.
 
 The `windows` parameter below is `0` or `1`, explicitly selecting path rules.
 `names`, `paths`, and returned component collections are encoded lists.
+All `sy.dict.*` helpers require `source dict.tcl`; their `keys` parameters
+are lists of path components, unlike the public command's separate arguments.
 
 | Signature | Result/behavior |
 | --- | --- |
 | `sy.list.index index length` | Resolve decimal/end/index arithmetic to an integer using `length - 1` for `end`. Insertion callers pass actual length plus one. Does not clamp to bounds. |
+| `sy.dict.find dictionary key` | Validate an even-length list and return the last matching key's element index, or -1; requires `dict.tcl` |
+| `sy.dict.normalize dictionary` | Canonical key/value list with first-key order and last duplicate values |
+| `sy.dict.get dictionary keys` | Retrieve a path supplied as a list of keys; missing keys and malformed traversed dictionaries fail |
+| `sy.dict.put dictionary key value remove` | Return a normalized dictionary with one key set, or removed when `remove` is 1 |
+| `sy.dict.update dictionary keys value remove` | Rebuild a nested path iteratively; return the updated dictionary without assigning caller variables |
 | `sy.path.parts path windows` | Two-element list `root names`: recognized root and list of remaining components |
 | `sy.path.type path windows` | Lexical `absolute`, `relative`, or `volumerelative` classification |
 | `sy.path.render root names` | Compose a path from root and components, using `/` separators |

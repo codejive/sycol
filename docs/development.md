@@ -32,7 +32,7 @@ skips setup and host checks; use the drivers for complete verification.
 | Files | Checks |
 | --- | --- |
 | `tests/all.tcl` | Shared test harness; syntax, substitution, scope, procedures, return levels, arithmetic, control flow, I/O, globals, and errors |
-| `tests/parser.tcl`, `lists.tcl`, `files.tcl`, `paths.tcl` | Additional parser, list, filesystem, and path cases sourced by `all.tcl` |
+| `tests/parser.tcl`, `lists.tcl`, `dict.tcl`, `files.tcl`, `paths.tcl` | Additional parser, list, dictionary, filesystem, and path cases sourced by `all.tcl` |
 | `tests/exec.tcl`, `fixtures/probe.sh`, `fixtures/probe.ps1` | Literal process arguments, stdout trimming, inherited stderr, nonzero exits, capture records, exact line endings, concurrent large streams, and cwd |
 | `tests/files-move.tcl` | Move operations, replacement, failure retention, and cross-filesystem behavior when fixture roots permit it |
 | `tests/native.tcl` | Registered native handler behavior |
