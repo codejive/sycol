@@ -30,9 +30,8 @@ Targets: **Bash 3.2+** with 64-bit shell arithmetic, and **Windows PowerShell
 
 | Shell | Command |
 | --- | --- |
-| Bash | `./sycol examples/hello.tcl Alice 'Bob Smith'` |
-| PowerShell | `& ./.sycol/bin/sycol.ps1 examples/hello.tcl Alice 'Bob Smith'` |
-| CMD | `sycol examples/hello.tcl Alice "Bob Smith"` |
+| Bash | `./sycol examples/hello.tcl Alice Bob` |
+| CMD/Pwsh | `.\sycol examples/hello.tcl Alice Bob` |
 
 Paths resolve from the current working directory. There is no REPL, stdin
 script mode, or `-c` mode. Add `.sycol/bin/` to `PATH` for direct invocation,
