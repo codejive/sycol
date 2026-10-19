@@ -65,6 +65,48 @@ substitutions, procedure bodies, and control bodies. Input length, loop count,
 output size, and running time otherwise depend on host resources. One sourced
 interpreter exposes one mutable instance; it is not reentrant or thread-safe.
 
+## Required native commands
+
+Every backend must provide the following native core commands before loading
+`core.tcl`. This is the bootstrap contract for a new host or a replacement
+native core. The authoritative behavior is in
+[SPEC.md section 6](../SPEC.md#6-native-command-contracts); the
+[command reference](commands.md) documents arguments, results, and errors.
+
+| Area | Required commands |
+| --- | --- |
+| Variables and procedures | `set`, `unset`, `global`, `proc` |
+| Evaluation and completion | `eval`, `uplevel`, `catch`, `return`, `break`, `continue`, `error` |
+| Control flow | `if`, `while` |
+| Lists | `list`, `llength`, `lindex` |
+| Strings | `string` with `length`, `equal`, and `range` subcommands |
+| Integer arithmetic | `+`, `-`, `*`, `/`, `%` |
+| Integer comparison and negation | `<`, `<=`, `>`, `>=`, `==`, `!=`, `!` |
+| Text output | `puts` |
+| Script and text files | `source`, `readfile`, `writefile` |
+| Working directory and environment | `pwd`, `cd`, `getenv` |
+| Processes | `exec`, `exit` |
+
+Implement the full Sycol contracts, including options, validation, frame
+effects, and completion propagation. For example, `exec` requires both plain
+execution and `-capture`; `return` requires `-code` and `-level`. Tcl behavior
+outside the specified Sycol subset is not required.
+
+The shipped cores also register `incr`, `append`, `concat`, and `lappend`.
+These are optional native SDK accelerators: a backend may omit them and use
+the portable definitions in `core.tcl`. Other shared SDK procedures likewise
+do not require native implementations. In particular, `sy.list.index` is a
+shared helper used by native `lindex` for non-integer index notation; that
+notation becomes available after SDK loading.
+
+The optional `files.tcl` module requires the native `sy.file` primitive when
+loaded. A backend supporting this module must implement all its operations:
+`windows`, `expand`, `list`, `type`, `exists`, `isfile`, `isdirectory`, `size`,
+`mkdir`, `delete`, `copy`, and `rename`. Their signatures and results are listed
+in the [native filesystem primitive reference](#native-filesystem-primitive).
+`sy.file` is not required at core bootstrap; public `file` option parsing and
+lexical path helpers remain shared Tcl procedures.
+
 ## Backend differences
 
 Both backends implement the same language, SDK, argument boundaries, and
