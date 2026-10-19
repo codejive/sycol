@@ -83,10 +83,34 @@ tab. A backslash before any other character removes the backslash and quotes
 that character: `\ ` includes a space, `\$` includes a literal dollar sign,
 and `\\` includes a backslash. There are no numeric or Unicode escape forms.
 
-Inside braces, backslashes remain literal and shield the following brace from
-nesting. The exception is backslash immediately followed by LF: it and any
-following spaces/tabs fold to one space, in every quoting form. Between bare
-words this separates words; inside quotes or braces it remains within the word.
+Inside a braced word, unescaped inner braces must balance, but do not need
+escaping. These inner pairs remain in the value; only the outermost pair is
+removed. Backslashes remain literal. A backslash before `{` or `}` prevents
+that brace from opening or closing a group; both the backslash and brace
+remain in the resulting value:
+
+```tcl
+puts {a {b} c}                  ;# Prints: a {b} c
+puts {a {b} \{ c}               ;# Prints: a {b} \{ c
+puts {a \} b}                   ;# Prints: a \} b
+```
+
+In the second line, `{b}` is a balanced inner pair. The escaped `\{` does not
+open another pair, so the final `}` closes the word. Its backslash remains
+visible in the output; escaping here changes brace matching, not the value.
+
+To include an unmatched brace without a backslash in the value, use a quoted
+word. Braces inside quotes are ordinary characters, though variable, command,
+and backslash substitutions still apply:
+
+```tcl
+puts "a {b} { c"                ;# Prints: a {b} { c
+```
+
+The exception to literal backslashes inside braces is backslash immediately
+followed by LF: it and any following spaces/tabs fold to one space, in every
+quoting form. Between bare words this separates words; inside quotes or braces
+it remains within the word.
 
 ```tcl
 puts "first line\nsecond line"
@@ -194,7 +218,19 @@ Sycol's `apply` invokes a named command; it does not accept Tcl lambdas.
 Arithmetic operators are commands: `[+ 2 3]`, `[* $n $n]`, `[< $n 10]`.
 There is no `expr` or infix expression parser. Arithmetic accepts signed
 decimal 32-bit integers; leading zeros are decimal. Overflow and division
-by zero are errors. Use `eq`, `ne`, or `string equal` for string comparisons.
+by zero are errors.
+
+Use `==` for numeric equality and `!=` for numeric inequality. They compare
+integer values, so `01` and `1` are equal. Use `eq`, `ne`, or `string equal`
+to compare exact text, even when it contains digits. These comparisons return
+`1` for true and `0` for false:
+
+```tcl
+puts [== 01 1]                 ;# 1: equal integer values
+puts [!= 01 1]                 ;# 0: the integers do not differ
+puts [eq 01 1]                 ;# 0: different strings
+puts [ne 01 1]                 ;# 1: the strings differ
+```
 
 `if` takes a computed boolean. `while` and `for` take a script that computes
 the condition again on each iteration. Boolean values are lowercase `true`,
