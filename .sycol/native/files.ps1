@@ -1,5 +1,5 @@
 # Resolve through PowerShell's cwd, which need not be the process cwd.
-function Get-SyFilePath([string]$Path, [bool]$ExpandHome=$true) {
+function script:Get-SyFilePath([string]$Path, [bool]$ExpandHome=$true) {
     if (!$Path.Length) { throw 'empty file path' }
     if ($ExpandHome -and $Path.StartsWith('~')) {
         if ($Path.Length -gt 1 -and $Path[1] -ne '/' -and $Path[1] -ne '\') { throw 'named-user home paths are not supported' }
@@ -16,7 +16,7 @@ function Get-SyFilePath([string]$Path, [bool]$ExpandHome=$true) {
 }
 # On Unix, older supported .NET versions have no public Unix mode API.
 # Use standard stat/chmod utilities without a shell or PowerShell argv conversion.
-function Invoke-SyFileUtility([string]$Program, [string[]]$Arguments) {
+function script:Invoke-SyFileUtility([string]$Program, [string[]]$Arguments) {
     $process=New-Object Diagnostics.Process
     try {
         $info=$process.StartInfo; $info.FileName=$Program; $info.UseShellExecute=$false
@@ -28,11 +28,11 @@ function Invoke-SyFileUtility([string]$Program, [string[]]$Arguments) {
         return $output.Trim()
     } finally { $process.Dispose() }
 }
-function Get-SyUnixMode([string]$Path) {
+function script:Get-SyUnixMode([string]$Path) {
     try { return [Convert]::ToInt32((Invoke-SyFileUtility stat @('-L','-c','%f',$Path)),16) }
     catch { return [Convert]::ToInt32((Invoke-SyFileUtility stat @('-L','-f','%p',$Path)),8) }
 }
-function Get-SyFileType([string]$Path) {
+function script:Get-SyFileType([string]$Path) {
     $item=Get-Item -LiteralPath $Path -Force -ErrorAction Stop
     if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { return 'link' }
     if ($item -is [IO.DirectoryInfo]) { return 'directory' }
@@ -49,10 +49,10 @@ function Get-SyFileType([string]$Path) {
     if ($item -is [IO.FileInfo]) { return 'file' }
     throw 'unsupported file type'
 }
-function Get-SyOptionalFileType([string]$Path) {
+function script:Get-SyOptionalFileType([string]$Path) {
     try { return Get-SyFileType $Path } catch [System.Management.Automation.ItemNotFoundException] { return '' }
 }
-function Remove-SyFile([string]$Path, [bool]$Recursive, [bool]$Force) {
+function script:Remove-SyFile([string]$Path, [bool]$Recursive, [bool]$Force) {
     $kind=Get-SyFileType $Path
     if ($kind -eq 'directory') {
         if ($Force) {
@@ -80,7 +80,7 @@ function Remove-SyFile([string]$Path, [bool]$Recursive, [bool]$Force) {
         [IO.File]::Delete($Path)
     }
 }
-function Get-SyCopyTree([string]$Path) {
+function script:Get-SyCopyTree([string]$Path) {
     $item=Get-Item -LiteralPath $Path -Force -ErrorAction Stop
     $tree=@{ Path=$Path; Kind=(Get-SyFileType $Path); Children=@();
         Write=$item.LastWriteTimeUtc; Access=$item.LastAccessTimeUtc; Attributes=$item.Attributes; Mode=0 }
@@ -90,7 +90,7 @@ function Get-SyCopyTree([string]$Path) {
     }
     return $tree
 }
-function Copy-SyFile([string]$Path, [string]$Target, $Tree=$null, [bool]$Overwrite=$false) {
+function script:Copy-SyFile([string]$Path, [string]$Target, $Tree=$null, [bool]$Overwrite=$false) {
     # Snapshot before creating directories to keep traversal finite through aliases.
     if ($null -eq $Tree) { $Tree=Get-SyCopyTree $Path }
     $kind=$Tree.Kind
@@ -119,7 +119,7 @@ function Copy-SyFile([string]$Path, [string]$Target, $Tree=$null, [bool]$Overwri
     }
 }
 # Resolve parent links for comparisons without dereferencing a final link.
-function Resolve-SyDirectoryPath([string]$Path, [int]$Links=0) {
+function script:Resolve-SyDirectoryPath([string]$Path, [int]$Links=0) {
     if ($Links -gt 40) { throw 'too many directory links' }
     if ($Path -eq [IO.Path]::GetPathRoot($Path)) { return $Path }
     $parent=[IO.Path]::GetDirectoryName($Path)
@@ -132,11 +132,11 @@ function Resolve-SyDirectoryPath([string]$Path, [int]$Links=0) {
     }
     return Join-Path (Resolve-SyDirectoryPath $parent $Links) ([IO.Path]::GetFileName($Path))
 }
-function Resolve-SyEntryPath([string]$Path, [string]$Kind) {
+function script:Resolve-SyEntryPath([string]$Path, [string]$Kind) {
     if ($Kind -eq 'directory') { return Resolve-SyDirectoryPath $Path }
     return Join-Path (Resolve-SyDirectoryPath ([IO.Path]::GetDirectoryName($Path))) ([IO.Path]::GetFileName($Path))
 }
-function Move-SyFile([string]$Path, [string]$Target, [string]$Kind, [bool]$Replace) {
+function script:Move-SyFile([string]$Path, [string]$Target, [string]$Kind, [bool]$Replace) {
     if ($env:OS -eq 'Windows_NT' -and ![string]::Equals([IO.Path]::GetPathRoot($Path),[IO.Path]::GetPathRoot($Target),[StringComparison]::OrdinalIgnoreCase)) {
         Copy-SyFile $Path $Target $null $Replace
         Remove-SyFile $Path $true $true

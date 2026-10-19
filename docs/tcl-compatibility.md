@@ -62,7 +62,10 @@ part of Sycol's design rather than an incomplete `expr` parser.
 Only a leading `::` selects global variables. Internal colons are literal
 name characters, not namespaces. Unqualified lookup stays in the current
 frame. Procedures are global definitions without closures. Script procedures
-can override any command, but there is no command renaming/deletion,
+can replace other Tcl procedures, but native handlers always win. This differs
+from Tcl command replacement; same-name Tcl definitions remain hidden. There
+is no package autoloading: Sycol-specific paths extend `source` lookup.
+There is no command renaming/deletion,
 introspection, or `unknown` dispatch hook.
 
 ## Process and filesystem boundaries

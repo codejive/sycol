@@ -3,79 +3,134 @@ set -e
 cd -- "${BASH_SOURCE[0]%/*}/.."
 root=$PWD
 engine=${SYCOL_BASH:-bash}
-temp=$(mktemp -d "${TMPDIR:-/tmp}/sycol-discovery.XXXXXXXX")
+temp=$(mktemp -d "${TMPDIR:-/tmp}/sycol-modules.XXXXXXXX")
 cleanup() {
-    rm -f -- "$temp"/.sycol/native/nested/* "$temp"/.sycol/sdk/nested/*
-    rmdir -- "$temp/.sycol/native/nested" "$temp/.sycol/sdk/nested"
-    rm -f -- "$temp"/.sycol/native/* "$temp"/.sycol/sdk/* "$temp/.sycol/native/.hidden.sh" "$temp/.sycol/sdk/.hidden.tcl" "$temp/sycol" "$temp/test.tcl" "$temp/empty.tcl" "$temp/output"
-    rm -f -- "$temp/.sycol/bin/sycol" "$temp/.sycol/VERSION"
-    rmdir -- "$temp/.sycol/native" "$temp/.sycol/sdk" "$temp/.sycol/bin" "$temp/.sycol" "$temp"
+    # The exact unique fixture root is verified before recursive cleanup.
+    case $temp in "${TMPDIR:-/tmp}/sycol-modules."*) rm -rf -- "$temp";; esac
 }
 trap cleanup EXIT
-mkdir -p "$temp/.sycol/native/nested" "$temp/.sycol/sdk/nested" "$temp/.sycol/bin"
-cp sycol "$temp/sycol"
-cp .sycol/bin/sycol "$temp/.sycol/bin/sycol"
-cp .sycol/VERSION "$temp/.sycol/VERSION"
-# No hard-coded core filename, including for native discovery.
-cp .sycol/native/core.sh "$temp/.sycol/native/builtins.sh"
-cp .sycol/sdk/*.tcl "$temp/.sycol/sdk/"
+mkdir -p "$temp/.sycol/bin" "$temp/.sycol/lib/sub" "$temp/.sycol/lib-sibling" "$temp/.sycol/native/sub" "$temp/user" "$temp/extra-sdk" "$temp/extra-native"
+mkdir -p "$temp/.sycol/lib/directory.tcl"
+printf '%s\n' 'proc wrong.directory.fallback {} {}' > "$temp/user/directory.tcl"
+cp .sycol/bin/sycol "$temp/.sycol/bin/"
+cp .sycol/VERSION "$temp/.sycol/"
+cp .sycol/native/*.sh "$temp/.sycol/native/"
+cp .sycol/lib/*.tcl "$temp/.sycol/lib/"
 cp tests/discovery.tcl "$temp/test.tcl"
-: > "$temp/empty.tcl"
-# Create reverse filename order to expose reliance on directory enumeration.
-cat > "$temp/.sycol/native/z-last.sh" <<'EOF'
-native_last() { R=last; }
-native_echo() { quote_list "$@"; }
-native_override() { R=overridden; }
-sy_register native.order native_last
-sy_register native.echo native_echo
-sy_register getenv native_override
+printf '%s\n' 'proc fileless.path {name} { return "[pwd]/$name" }' >> "$temp/.sycol/lib/core.tcl"
+cat > "$temp/.sycol/lib/sample.tcl" <<'EOF'
+incr ::tcl_loads
+proc replacement {} { return fallback }
+
 EOF
-cat > "$temp/.sycol/native/a-first.sh" <<'EOF'
-native_first() { R=first; }
-sy_register native.order native_first
+cat > "$temp/.sycol/lib/pure.tcl" <<'EOF'
+proc portable {} { return portable }
+
 EOF
-printf '%s\n' 'proc sdk.order {} { return last }' > "$temp/.sycol/sdk/z-last.tcl"
-printf '%s\n' 'proc sdk.order {} { return first }' > "$temp/.sycol/sdk/a-first.tcl"
-for file in "$temp/.sycol/native/.hidden.sh" "$temp/.sycol/native/ignored.SH" "$temp/.sycol/native/wrong.ps1" "$temp/.sycol/native/nested/ignored.sh"; do
-    printf '%s\n' 'return 1' > "$file"
-done
-for file in "$temp/.sycol/sdk/.hidden.tcl" "$temp/.sycol/sdk/ignored.TCL" "$temp/.sycol/sdk/wrong.sh" "$temp/.sycol/sdk/nested/ignored.tcl"; do
-    printf '%s\n' 'error ignored-file-was-loaded' > "$file"
-done
-# Source the interpreter, then change cwd before starting it.
+cat > "$temp/.sycol/lib/sub/nested.tcl" <<'EOF'
+proc nested.native {} { return fallback }
+
+EOF
+cat > "$temp/.sycol/lib/space name.tcl" <<'EOF'
+proc space.native {} { return fallback }
+
+EOF
+cat > "$temp/.sycol/lib/broken.tcl" <<'EOF'
+error first-broken
+
+EOF
+cat > "$temp/.sycol/lib/bad-native.tcl" <<'EOF'
+proc should.not.exist {} {}
+
+EOF
+cat > "$temp/.sycol/lib/rogue.tcl" <<'EOF'
+error unrelated-sdk-was-loaded
+
+EOF
+cat > "$temp/user/files.tcl" <<'EOF'
+proc user.files {} { return user }
+
+EOF
+cat > "$temp/user/sample.tcl" <<'EOF'
+proc user.sample {} { return user }
+
+EOF
+cat > "$temp/user/library.tcl" <<'EOF'
+proc library {} { return user }
+
+EOF
+cat > "$temp/user/extra.tcl" <<'EOF'
+proc precedence {} { return user }
+
+EOF
+cat > "$temp/user/broken.tcl" <<'EOF'
+error wrong-fallback
+
+EOF
+cat > "$temp/extra-sdk/extra.tcl" <<'EOF'
+proc precedence {} { return sdk }
+
+EOF
+cat > "$temp/cwd-only.tcl" <<'EOF'
+proc cwd.only {} { return cwd }
+
+EOF
+cat > "$temp/scope.tcl" <<'EOF'
+set marker after
+
+EOF
+cat > "$temp/return.tcl" <<'EOF'
+return returned
+error unreachable
+
+EOF
+cat > "$temp/empty.tcl" <<'EOF'
+
+EOF
+cat > "$temp/.sycol/native/sample.sh" <<'EOF'
+MODULE_LOADS=$(( ${MODULE_LOADS:-0}+1 ))
+module_replacement() { R=native; }
+module_loads() { R=$MODULE_LOADS; }
+sy_register replacement module_replacement
+sy_register native.loads module_loads
+EOF
+printf '%s\n' 'nested_native() { R=nested; }; sy_register nested.native nested_native' > "$temp/.sycol/native/sub/nested.sh"
+printf '%s\n' 'space_native() { R=space; }; sy_register space.native space_native' > "$temp/.sycol/native/space name.sh"
+printf '%s\n' 'FAIL_LOADS=$(( ${FAIL_LOADS:-0}+1 )); failed_loads() { R=$FAIL_LOADS; }; sy_register native.failed-loads failed_loads; return 1' > "$temp/.sycol/native/bad-native.sh"
+printf '%s\n' 'proc secondary.native {} { return fallback }' > "$temp/extra-sdk/secondary.tcl"
+printf '%s\n' 'secondary_native() { R=secondary; }; sy_register secondary.native secondary_native' > "$temp/extra-native/secondary.sh"
+printf '%s\n' 'true' > "$temp/extra-native/bad-native.sh"
+printf '%s\n' 'proc outsider {} {}' > "$temp/.sycol/lib-sibling/outsider.tcl"
+printf '%s\n' 'outside_native() { R=wrong; }; sy_register outsider.native outside_native' > "$temp/.sycol/native/outsider.sh"
+printf '%s\n' 'return 1' > "$temp/.sycol/native/unrelated.sh"
+(cd -- "$temp"; "$engine" .sycol/bin/sycol test.tcl)
+# Embedding captures defaults before cwd changes, and loads no Tcl SDK yet.
 (
     set +e
-    builtin cd -- "$temp" || exit 1
-    source ./.sycol/bin/sycol || exit 1
+    source "$temp/.sycol/bin/sycol" || exit 1
     dispatch incr n
-    [[ $C == 1 && $R == 'unknown command: incr' ]] || exit 1
-    embedding_override() { R=embedded; }
-    sy_register native.order embedding_override
-    dispatch native.order
-    [[ $C == 0 && $R == embedded ]] || exit 1
+    [[ $C == 1 ]] || exit 1
     builtin cd -- "$root" || exit 1
-    main "$root/examples/hello.tcl" > "$temp/output"
-) || { printf '%s\n' 'embedding lifecycle failed' >&2; exit 1; }
-(cd -- "$temp"; "$engine" ./sycol test.tcl)
-# A malformed SDK must stop startup before the requested script runs.
-printf '%s\n' 'error sdk-broken' > "$temp/.sycol/sdk/0-broken.tcl"
-if "$engine" "$temp/sycol" "$root/examples/hello.tcl" > "$temp/output" 2>&1; then exit 1; fi
-[[ $(< "$temp/output") == *'0-broken.tcl: sdk-broken'* ]] || exit 1
-[[ $(< "$temp/output") != *'Hello, world!'* ]] || exit 1
-rm -- "$temp/.sycol/sdk/0-broken.tcl"
-printf '%s\n' 'return 1' > "$temp/.sycol/native/0-broken.sh"
-if "$engine" "$temp/sycol" "$temp/empty.tcl" > "$temp/output" 2>&1; then exit 1; fi
-[[ $(< "$temp/output") == *'cannot load native file:'*'0-broken.sh'* ]] || exit 1
-rm -- "$temp/.sycol/native/0-broken.sh"
-# Empty discovery sets are valid: no unmatched glob is sourced.
-rm -- "$temp"/.sycol/sdk/*.tcl
-"$engine" "$temp/sycol" "$temp/empty.tcl"
-rm -- "$temp"/.sycol/native/*.sh
-"$engine" -c 'source "$1"' _ "$temp/.sycol/bin/sycol"
-# Missing library directories are errors, unlike existing empty directories.
-(
-    source "$temp/.sycol/bin/sycol"
-    if library_files "$temp/missing" .tcl; then exit 1; fi
-    [[ $C == 1 && $R == "cannot read library directory: $temp/missing" ]]
-)
+    main "$temp/empty.tcl"
+) || exit 1
+# Environment overrides replace defaults and accept multiple directories/spaces.
+mkdir -p "$temp/override sdk" "$temp/override native"
+cp "$temp/.sycol/lib/core.tcl" "$temp/override sdk/"
+cp "$temp/.sycol/native/core.sh" "$temp/override native/"
+printf '%s\n' 'proc from.environment {} {return yes}' > "$temp/user/env.tcl"
+printf '%s\n' 'source env.tcl; puts [from.environment]' > "$temp/env-main.tcl"
+separator=:
+case ${OSTYPE-} in msys*|cygwin*) separator=';';; esac
+SYCOL_SDK_PATH="$temp/missing${separator}$temp/override sdk" SYCOL_NATIVE_PATH="$temp/missing${separator}$temp/override native" SYCOL_SOURCE_PATH="$temp/user" \
+    "$engine" .sycol/bin/sycol "$temp/env-main.tcl" > "$temp/output"
+[[ $(< "$temp/output") == yes ]]
+printf '%s\n' 'error core-broken' > "$temp/.sycol/lib/core.tcl"
+if "$engine" "$temp/.sycol/bin/sycol" "$temp/empty.tcl" > "$temp/output" 2>&1; then exit 1; fi
+[[ $(< "$temp/output") == *core-broken* ]]
+rm -- "$temp/.sycol/lib/core.tcl"
+if "$engine" "$temp/.sycol/bin/sycol" "$temp/empty.tcl" > "$temp/output" 2>&1; then exit 1; fi
+[[ $(< "$temp/output") == *'cannot find SDK file: core.tcl'* ]]
+rm -- "$temp/.sycol/native/core.sh"
+if "$engine" "$temp/.sycol/bin/sycol" "$temp/empty.tcl" > "$temp/output" 2>&1; then exit 1; fi
+[[ $(< "$temp/output") == *'cannot find native file: core.sh'* ]]
 printf '%s\n' 'library lifecycle tests passed'

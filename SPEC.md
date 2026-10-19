@@ -32,7 +32,7 @@ The files shipped together are:
 | `.sycol/bin/sycol.bat` | CMD launcher for the adjacent PowerShell implementation |
 | `.sycol/VERSION` | Single source for the Sycol project/release version |
 | `.sycol/native/core.sh`, `.sycol/native/core.ps1` | Registered built-in native handlers |
-| `.sycol/sdk/*.tcl` | Shared SDK procedures, grouped by responsibility |
+| `.sycol/lib/*.tcl` | Shared SDK procedures, grouped by responsibility |
 | `tests/all.tcl` | Shared language and SDK conformance tests |
 | `tests/exec.tcl` | Shared process tests using small host probes |
 | `tests/run.sh`, `tests/run.ps1` | Temporary directories, host invocation, cleanup |
@@ -83,12 +83,11 @@ release version followed by a newline and exits 0 without loading the SDK or a
 script. Extra arguments after this option print usage to stderr and exit 2.
 Otherwise the first argument is a filename; use `./--version` for a script
 literally named `--version`. Arguments after a script filename remain literal.
-Missing the first argument prints usage to stderr and exits 2. Sourcing the interpreter
-registers native handlers from `.sycol/native/`. Startup initializes global
-variables, sources the SDK files in `.sycol/sdk/`, then sources the requested
-script in the global frame. Library paths resolve relative to the interpreter
-file, even if an embedded caller changes the working directory before startup.
-Failure to discover or load a library, or to load the requested script, is fatal.
+Missing the first argument prints usage to stderr and exits 2. Sourcing the
+interpreter initializes search paths and loads only the mandatory native core.
+Startup initializes script globals, sources `core.tcl`, then evaluates the
+requested script in the global frame. See section 8 for resolution and overrides.
+Failure to load core or the requested script is fatal.
 The final script value is not printed automatically. `puts` produces output.
 
 | Global variable | Initial value |
@@ -125,8 +124,8 @@ it cannot be intercepted by `catch`, procedures, or `source`, and prints no
 diagnostic. Embedded applications must account for it terminating their host.
 There is no REPL, stdin script mode, or `-c` mode.
 
-All relative file paths, including nested `source` paths, resolve against the
-current working directory. Sourcing a file does not change that directory.
+Relative file operations use cwd. `source` uses the resolution rules in section 8;
+it never changes cwd or resolves against the containing script directory.
 
 ## 3. Values and parsing
 
@@ -200,9 +199,10 @@ with `::`. A final parameter named `args` collects all remaining arguments as
 a proper list, including zero arguments. Missing required or excess arguments
 are errors. Defaults are literal strings and are not evaluated.
 
-Dispatch checks script procedures, then registered native handlers. Built-in
-primitives use the same registry as native extensions. Script definitions may
-override built-ins and SDK procedures. There is no implicit `unknown` handler
+Dispatch checks registered native handlers, then script procedures. Built-in
+primitives use the same registry as native extensions. Tcl definitions can replace
+other Tcl procedures, but cannot shadow native handlers; same-name definitions
+are legal and remain hidden. There is no implicit `unknown` handler
 or OS command fallback.
 There is no command deletion, command-renaming operation, or introspection subsystem.
 
@@ -258,7 +258,8 @@ runtime, not a security sandbox.
 
 ## 6. Native command contracts
 
-These commands constitute the irreducible host layer in this version. All
+These commands define the host contracts in this version. `sy.file` is optional
+and becomes available with `source files.tcl`; other listed commands are core. All
 listed argument counts are checked; extra arguments are errors. Commands that
 do not return a meaningful value return the empty string.
 
@@ -425,11 +426,11 @@ export environment variables.
 
 ## 7. Shared Tcl SDK
 
-The launcher loads the SDK from all direct `.tcl` files in `.sycol/sdk/` before
-the requested script. The shipped files are `control.tcl`, `files.tcl`, `lists.tcl`, `paths.tcl`,
-`strings.tcl`, and `variables.tcl`. Applications extend it by defining
-procedures or sourcing additional files. No host dispatcher change is needed
-to add a Tcl procedure.
+The launcher loads only `.sycol/lib/core.tcl`. The optional `files.tcl`
+module combines filesystem dispatch with lexical path helpers and loads via
+`source files.tcl`. Core's shared procedures remain portable Tcl; native
+handlers can supply equivalent implementations without changing SDK definitions.
+The `file` entries below require the optional module.
 
 | Procedure | Contract |
 | --- | --- |
@@ -537,7 +538,7 @@ length. Size results can exceed the arithmetic core's signed 32-bit range;
 such values remain valid strings. Directory sizes are host-dependent (0 on
 Windows PowerShell); use size primarily for regular files.
 
-Path helpers live in the shared `paths.tcl` SDK and do not access the filesystem,
+Path helpers live in the shared `files.tcl` SDK and do not access the filesystem,
 except that dirname/tail expand a bare home name such as `~`, as Tcl 8.6 does.
 They do not resolve `.` or `..` or symbolic links. Unix recognizes `/`; Windows
 also recognizes backslashes, drive-relative paths such as `C:foo`, drive roots,
@@ -604,44 +605,116 @@ proc twice {n} { * 2 $n }
 proc git-status {} { exec git status --short }
 
 # app/main.tcl
-source app/sdk.tcl
+source ./app/sdk.tcl
 puts [twice 21]
 puts [git-status]
 ```
 
 ## 8. Native extension and embedding interface
 
-Native extensions are trusted host code. They receive already decoded strings
-and set the interpreter's result/completion explicitly. They must validate
-arity, preserve caller frames, avoid unrequested stdout output, and translate
-host failures into code 1. The interpreter sources all direct `.sh` files
-(Bash) or dot-sources all direct `.ps1` files (PowerShell) in `.sycol/native/`
-when the interpreter itself is sourced. The shipped `core.sh` and `core.ps1`
-have no special filename treatment. Additional native files should only define
-helpers and register handlers, without invoking Sycol commands during loading.
-A custom launcher can also register handlers after sourcing the interpreter
-and before calling `main` or `Start-Sycol`.
+Native extensions are trusted host code. They receive decoded strings and
+set result/completion explicitly. Validate arity, preserve caller frames,
+avoid unrequested stdout, and translate host failures into code 1. Native files
+should define helpers/register handlers, without invoking Sycol scripts during
+loading. SDK files should define procedures; their bodies resolve dependencies
+when called. PowerShell native helper functions must use `function script:Name`
+to survive on-demand loading from a function scope. Bash native files must return
+success; PowerShell loading errors are fatal.
 
-Both native and SDK discovery ignore subdirectories, filenames beginning with
-`.`, and files with another extension. Extensions are matched case-sensitively.
-Files load alphabetically with locale-independent sorting: C-locale glob order
-on Bash and ordinal string order on PowerShell. Use lowercase ASCII library
-filenames for identical ordering across hosts; non-ASCII filename ordering is
-not portable. Neither loader maintains a hard-coded list of filenames.
-Missing or unreadable library directories fail initialization; an existing
-empty directory contributes no definitions. A distribution still needs its
-shipped built-ins and SDK procedures to provide the specified language.
-Library load failures stop loading and identify the failing file, without
-rolling back definitions already installed. Native Bash files must return
-success after registration; PowerShell loading treats host errors as fatal.
+### Module loading and search paths
 
-SDK files should only define procedures. Their bodies may refer to procedures
-defined in other files, since those names resolve when called. Files must not
-depend on another library file having already loaded. Repeated definitions
-follow the usual replacement rules; later native registrations replace earlier
-ones, and script procedures take precedence over every native handler.
-There is no recursive discovery, configurable module search path, or automatic
-loading of host files from the user's working directory.
+Only `core.tcl` loads automatically. It contains loops, list operations,
+string helpers, and variable helpers. Filesystem commands and their lexical
+path helpers require `source files.tcl`. Native core commands such as
+`source`, `readfile`, `writefile`, `pwd`, and `cd` remain available at bootstrap.
+There is no directory scan or automatic command/package loading.
+
+| Environment variable | Mutable Sycol global | Installation default |
+| --- | --- | --- |
+| `SYCOL_SDK_PATH` | `::sycol_sdk_path` | `.sycol/lib` |
+| `SYCOL_NATIVE_PATH` | `::sycol_native_path` | `.sycol/native` |
+| `SYCOL_SOURCE_PATH` | `::sycol_source_path` | Empty list |
+
+Environment overrides replace, rather than extend, defaults. Environment
+values use `;` on Windows (including Git Bash/MSYS) and `:` on Unix. Empty
+entries are ignored; a present empty value supplies no directories. Directory
+names use the executing host's path syntax. Globals are proper Sycol lists,
+initialized when the interpreter is sourced. Defaults are installation-relative
+absolute paths captured before an embedder can change cwd. SDK and native
+defaults are independent. Explicit relative directory entries resolve against
+the working directory at each load. Scripts can change globals for subsequent
+loads; environment changes after initialization do not update them.
+
+```tcl
+lappend ::sycol_source_path /opt/my-library
+source files.tcl
+source utility.tcl
+source ./local-script.tcl
+```
+
+`source` resolves absolute paths directly. Paths beginning with `./` or `../`
+are relative to cwd; Windows PowerShell also accepts `.\` and `..\` and
+handles rooted/volume-relative Windows paths directly. Other relative names,
+including subdirectories, search SDK directories first, then source directories.
+There is no implicit cwd fallback. The entry script passed to the launcher
+always resolves directly against cwd, independently of search paths. Other file
+commands keep their existing cwd-relative behavior. No source operation changes cwd.
+
+The first existing candidate wins, even if it cannot be read or is a directory;
+loading errors never fall through to another candidate. Missing search directories
+are skipped. Invalid list globals or invalid paths produce catchable errors.
+Source returns the script result, evaluates in the current frame, and consumes
+one return boundary, as before.
+
+Paths are normalized lexically to absolute paths, collapsing `.`/`..` and
+redundant separators, without resolving symbolic links. SDK membership uses a
+directory-component boundary, not a raw filename prefix. Windows PowerShell
+compares paths without case sensitivity; Unix and Bash use case-sensitive
+comparisons. If SDK roots overlap, the first containing root determines the
+module-relative path. Symlink aliases can therefore have different classifications
+or backend identities. These trusted-code paths are not a security boundary.
+
+For an SDK file ending in `.tcl`, strip that extension from its path relative
+to the containing SDK root and append `.sh` (Bash) or `.ps1` (PowerShell).
+Search that relative backend path in native directories, in order. For example,
+`sub/tools.tcl` matches `sub/tools.sh` or `sub/tools.ps1`. All hosts share the
+same `native/` directory; there are no per-host subdirectories. Explicitly
+requested dot-prefixed files/subdirectories are allowed; nothing is enumerated.
+Files outside configured SDK roots never trigger backend loading, even when
+their basenames match SDK files.
+
+The selected Tcl file is read and checked for NUL before loading its backend;
+the backend is installed before Tcl evaluation. Missing backends are allowed.
+Existing backends that fail to load stop the source operation. Successfully
+loaded backends execute once per normalized absolute filename per interpreter;
+failed loads are remembered and fail again without rerunning host code. Windows
+PowerShell treats differently cased spellings as one backend identity. Missing
+backends are not cached, so later path changes or new files can supply them.
+Repeated `source` always reevaluates Tcl. Partial native registrations and Tcl
+side effects are not rolled back after errors.
+
+At interpreter sourcing, initialize the paths and load the first `core.sh` or
+`core.ps1` on the native path. This backend is mandatory and must provide the
+bootstrap contract. Normal startup loads the first `core.tcl` on the SDK path;
+it is mandatory and cannot fall back to a user source directory. Overrides
+must supply compatible core files; installation defaults are not appended.
+`--version` skips Tcl SDK and entry-script loading. Embedders can call `load_sdk`
+or `Import-SySdk` to load just `core.tcl` in the current frame.
+
+Native handlers always take precedence over Tcl procedures, regardless of
+definition order. Defining a same-name Tcl procedure is legal, but it remains
+hidden. Later native registrations replace earlier native handlers. Backends
+may implement any subset of an SDK module's commands; the remaining commands
+use portable Tcl definitions. No production optimizations are introduced by
+this loading design. There is no retry through Tcl after a native error.
+
+SDK and native path ordering is independent: they are not paired by index.
+Use compatible distributions across all configured roots. Matching filenames
+do not establish version compatibility; there is no version negotiation or
+automatic fallback to another backend on failure. Native replacements must
+preserve the public command's arguments, results, errors, frame effects, and
+completion semantics. Future compiled-in hosts may activate handlers by module
+identity instead of loading host files; no Java backend is implemented here.
 
 Bash:
 
@@ -686,11 +759,11 @@ explicitly. Catch host exceptions and call `Set-SyError` yourself.
 
 Both files can be sourced without launching a script. An embedded caller may
 use the evaluator with native handlers but without the SDK, or explicitly load
-the SDK with `load_sdk` (Bash) or `Import-SySdk` (PowerShell). These helpers load
+`core.tcl` with `load_sdk` (Bash) or `Import-SySdk` (PowerShell). These helpers load
 in the current frame; normal launcher startup uses the global frame.
 They expose one mutable interpreter instance per sourcing, not a reentrant,
 thread-safe API. Native extension lookup is case-sensitive. Re-registering a
-native name replaces its effective handler; a script procedure still wins.
+native name replaces its effective handler; the native handler always wins over Tcl definitions.
 
 ## 9. Compatibility boundaries and non-goals
 
@@ -726,8 +799,9 @@ exit status, capture records and preserved line endings, simultaneous large
 stdout/stderr output, and current working directory using small host-specific probes.
 
 Discovery tests copy an installation into a unique temporary directory and
-verify ordering, extension filtering, argument boundaries, overrides, embedding,
-empty discovery, and startup failures. Drivers clean their generated files and
+verify search ordering, SDK membership, native-first precedence, pure Tcl
+fallback, repeated source, mutable paths, environment overrides, embedding,
+and core/backend failures. Drivers clean their generated files and
 empty directories, and propagate test failures. CI selects `/bin/bash` on
 macOS to exercise the 3.2 target and runs Windows PowerShell 5.1 separately
 from PowerShell 7. CI also checks PowerShell on Unix. Local availability of a

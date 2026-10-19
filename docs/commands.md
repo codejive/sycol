@@ -3,8 +3,9 @@
 [Documentation](README.md) · [Language basics](language.md) · [Tcl compatibility](tcl-compatibility.md)
 
 This reference covers every application command in a normal installation,
-including the automatically loaded SDK. Native commands and shared Tcl
-procedures have the same calling syntax. Internal `sy.*` helpers are listed in
+including automatic `core.tcl` and optional `files.tcl` (`source files.tcl`).
+Native commands and shared Tcl procedures have the same calling syntax.
+Internal `sy.*` helpers are listed in
 the [implementation guide](implementation.md#internal-command-reference).
 
 In signatures, literals are bold and parameter placeholders are italic.
@@ -57,7 +58,8 @@ not create a value. A leading `::` is accepted.
 
 Define/replace a globally registered command; return empty. `parameters` is a list of
 names or `{name default}` pairs. A final `args` parameter collects remaining
-arguments as a list.
+arguments as a list. This replaces other Tcl procedures, but a registered native
+handler with the same name always wins; the Tcl definition remains hidden.
 
 ### **incr** _name_ ?_amount_?
 
@@ -513,7 +515,24 @@ empty. No channel argument.
 - *path*: UTF-8 script file to read and evaluate.
 
 Read and evaluate a UTF-8 file in the current frame; return its script result after
-handling one return boundary. Normalize CRLF to LF.
+handling one return boundary. Normalize CRLF to LF. Absolute paths select files
+directly; `./` and `../` paths use cwd. Other relative paths search
+`::sycol_sdk_path`, then `::sycol_source_path`, each a list of directories.
+No implicit cwd fallback occurs. The first existing candidate wins; missing,
+unreadable, invalid, or malformed-list paths and evaluation failures are errors.
+
+Files inside SDK roots activate matching native backends before Tcl evaluation.
+Missing backends are allowed; failed backends stop loading. Backends load once,
+while Tcl evaluates on every source. Native handlers always win over same-name
+Tcl definitions. See [module loading](implementation.md#library-discovery) for
+environment settings, defaults, subdirectory matching, and bootstrap behavior.
+
+```tcl
+source files.tcl
+lappend ::sycol_source_path /opt/my-library
+source utility.tcl
+source ./local.tcl
+```
 
 ### **readfile** _path_
 
@@ -547,13 +566,14 @@ Change the host's working directory; return empty. Exactly one path is required.
 Return a process environment variable, or empty if absent. Name must match
 `[A-Za-z_][A-Za-z0-9_]*`; lookup uses host case sensitivity.
 
-Paths are literal and relative to the current working directory. Text files
-must be valid UTF-8 without NUL. A leading UTF-8 BOM is stripped by `source`
+Paths are literal. Except for `source` search rules above, relative paths use cwd.
+Text files must be valid UTF-8 without NUL. A leading UTF-8 BOM is stripped by `source`
 and `readfile`; encoding itself is not validated. Handles are closed before
 returning. I/O failures are catchable errors. There are no channel or binary
 I/O commands. Setting a Sycol variable does not export an environment variable.
 
 ```tcl
+source files.tcl
 file mkdir build
 writefile [file join build message.txt] "hello\n"
 puts -nonewline [readfile [file join build message.txt]]
@@ -614,6 +634,8 @@ argument list. An OS shell runs only if explicitly requested, for example
 utilities and Windows command-line conventions.
 
 ## Filesystem and paths
+
+Load this optional module with `source files.tcl` before using any `file` command.
 
 `file operation arguments...` is a shared SDK procedure using native filesystem
 primitives and shared path helpers. The following entries cover every supported

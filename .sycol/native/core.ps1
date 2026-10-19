@@ -1,4 +1,4 @@
-# Built-in native handlers. Loaded by discovery before SDK initialization.
+# Bootstrap native handlers, loaded before Tcl SDK initialization.
 
 Register-SyNative 'set' {
     param([string[]]$a)
@@ -84,7 +84,7 @@ Register-SyNative 'return' {
     if (!$level) { $script:Sy.C=$code; if ($code -eq 2) { $script:Sy.RC=0; $script:Sy.RL=1 } }
 }
 
-function Invoke-SyNativeFlow([string]$cmd, [string[]]$a) {
+function script:Invoke-SyNativeFlow([string]$cmd, [string[]]$a) {
     $n=$a.Count
     if ($n) { Set-SyArity $cmd } elseif ($cmd -ceq 'break') { $script:Sy.C=3 } else { $script:Sy.C=4 }
 }
@@ -125,7 +125,7 @@ Register-SyNative 'list' {
     ConvertTo-SyList $a
 }
 
-function Invoke-SyNativeListIndex([string]$cmd, [string[]]$a) {
+function script:Invoke-SyNativeListIndex([string]$cmd, [string[]]$a) {
     $n=$a.Count
     if (($cmd -ceq 'llength' -and $n -ne 1) -or ($cmd -ceq 'lindex' -and $n -ne 2)) { Set-SyArity "$cmd list ?index?"; return }
     $items=ConvertFrom-SyList $a[0]; if ($script:Sy.C) { return }
@@ -152,7 +152,7 @@ Register-SyNative 'string' {
     } else { Set-SyArity 'string length value | equal a b | range value first last' }
 }
 
-function Invoke-SyNativeMath([string]$cmd, [string[]]$a) {
+function script:Invoke-SyNativeMath([string]$cmd, [string[]]$a) {
     $n=$a.Count
     if (($cmd -ceq '!' -and $n -ne 1) -or ($cmd -cne '!' -and $n -ne 2)) { Set-SyArity "$cmd integers"; return }
     Convert-SyInteger $a[0]; if ($script:Sy.C) { return }; $x=[long]$script:Sy.R
@@ -189,20 +189,25 @@ Register-SyNative 'puts' {
     else { Set-SyArity 'puts ?-nonewline? value' }
 }
 
-function Invoke-SyNativeRead([string]$cmd, [string[]]$a) {
+function script:Invoke-SyNativeRead([string]$cmd, [string[]]$a, [string]$Display='') {
     $n=$a.Count
     if ($n -ne 1) { Set-SyArity "$cmd path"; return }
+    if (!$Display.Length) { $Display=$a[0] }
     # Decode as UTF-8 directly, without BOM-based encoding detection or validation.
     try {
         $bytes=[IO.File]::ReadAllBytes($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($a[0]))
         $text=(New-Object Text.UTF8Encoding($false)).GetString($bytes)
     }
-    catch { Set-SyError "cannot read file: $($a[0])"; return }
+    catch { Set-SyError "cannot read file: $Display"; return }
     if ($text.Length -and $text[0] -eq [char]0xFEFF) { $text=$text.Substring(1) }
-    if ($text.IndexOf([char]0) -ge 0) { Set-SyError "NUL in text file: $($a[0])"; return }
+    if ($text.IndexOf([char]0) -ge 0) { Set-SyError "NUL in text file: $Display"; return }
     if ($cmd -ceq 'source') { Invoke-SyScript ($text.Replace("`r`n","`n")); Complete-SyReturn } else { $script:Sy.R=$text }
 }
-Register-SyNative 'source' { param([string[]]$a); Invoke-SyNativeRead 'source' $a }
+Register-SyNative 'source' {
+    param([string[]]$a)
+    if ($a.Count -ne 1) { Set-SyArity 'source path'; return }
+    Invoke-SySource $a[0]
+}
 Register-SyNative 'readfile' { param([string[]]$a); Invoke-SyNativeRead 'readfile' $a }
 
 Register-SyNative 'writefile' {
@@ -252,7 +257,7 @@ Register-SyNative 'exit' {
 
 # Windows PowerShell lacks ProcessStartInfo.ArgumentList. Quote each argument by
 # the Windows CRT convention, including empty strings and final backslashes.
-function ConvertTo-SyWindowsArgument([string]$Value) {
+function script:ConvertTo-SyWindowsArgument([string]$Value) {
     $b=New-Object Text.StringBuilder; [void]$b.Append('"'); $slashes=0
     foreach ($ch in $Value.ToCharArray()) {
         if ($ch -ceq '\') { $slashes++; continue }
@@ -262,7 +267,7 @@ function ConvertTo-SyWindowsArgument([string]$Value) {
     }
     [void]$b.Append(('\' * (2*$slashes))); [void]$b.Append('"'); return $b.ToString()
 }
-function Invoke-SyProcess([string[]]$Arguments) {
+function script:Invoke-SyProcess([string[]]$Arguments) {
     $capture=$false; $first=0
     if ($Arguments.Count -gt $first -and $Arguments[$first] -ceq '-capture') { $capture=$true; $first++ }
     if ($Arguments.Count -gt $first -and $Arguments[$first] -ceq '--') { $first++ }

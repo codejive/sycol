@@ -54,13 +54,13 @@ function Assert-Release([string]$Launcher, [string[]]$Query, [int]$Status, [stri
 try {
     [void][IO.Directory]::CreateDirectory("$temp/.sycol/bin")
     [void][IO.Directory]::CreateDirectory("$temp/.sycol/native")
-    [void][IO.Directory]::CreateDirectory("$temp/.sycol/sdk")
+    [void][IO.Directory]::CreateDirectory("$temp/.sycol/lib")
     [void][IO.Directory]::CreateDirectory("$temp/work")
     Copy-Item -LiteralPath "$root/sycol.bat" -Destination "$temp/sycol.bat"
     Copy-Item -Path "$root/.sycol/bin/*" -Destination "$temp/.sycol/bin"
     Copy-Item -LiteralPath "$root/.sycol/VERSION" -Destination "$temp/.sycol/VERSION"
     Copy-Item -Path "$root/.sycol/native/*" -Destination "$temp/.sycol/native"
-    Copy-Item -Path "$root/.sycol/sdk/*" -Destination "$temp/.sycol/sdk"
+    Copy-Item -Path "$root/.sycol/lib/*" -Destination "$temp/.sycol/lib"
     Copy-Item -LiteralPath "$root/tests/fixtures/argv.tcl" -Destination "$temp/work/argument probe.tcl"
     . "$temp/.sycol/bin/sycol.ps1"
     Set-Location -LiteralPath "$temp/work"
@@ -130,7 +130,7 @@ try {
         Assert-Release $launcher @('version.tcl') 0 "9.8.7-test+build`n"
         Assert-Release $launcher @('--version','extra') 2 '' "usage: sycol script.tcl [args ...] | sycol --version`n"
     }
-    [IO.File]::WriteAllText("$temp/.sycol/sdk/0-broken.tcl",'error version-must-not-load-sdk')
+    [IO.File]::WriteAllText("$temp/.sycol/lib/core.tcl",'error version-must-not-load-sdk')
     Assert-Release $releaseLaunchers[0] @('--version') 0 "9.8.7-test+build`n"
     foreach ($value in @('', 'invalid version')) {
         [IO.File]::WriteAllText("$temp/.sycol/VERSION",$value)
@@ -144,7 +144,7 @@ try {
     $env:PATH=$oldPath
     $env:SYCOL_LAUNCH_LITERAL=$oldLiteral
     $env:SYCOL_LAUNCH_EXPAND=$oldExpand
-    foreach ($directory in @("$temp/.sycol/bin","$temp/.sycol/native","$temp/.sycol/sdk","$temp/.sycol","$temp/work",$temp)) {
+    foreach ($directory in @("$temp/.sycol/bin","$temp/.sycol/native","$temp/.sycol/lib","$temp/.sycol","$temp/work",$temp)) {
         if ([IO.Directory]::Exists($directory)) {
             foreach ($file in [IO.Directory]::GetFiles($directory)) { [IO.File]::Delete($file) }
             [IO.Directory]::Delete($directory)

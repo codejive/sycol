@@ -275,8 +275,10 @@ The options variable receives `-code CODE -level LEVEL` as a list. Advanced
 [command reference](commands.md#evaluation-and-completions).
 
 `source path` evaluates another UTF-8 file in the current variable frame.
-Its path resolves from the current working directory, as do nested sources;
-it does not resolve relative to the containing file. A procedure or `source`
+Absolute paths select a file directly; `./` and `../` use cwd. Other relative
+paths search SDK directories then user source directories, including for nested
+sources. They do not resolve relative to the containing file. See
+[library discovery](implementation.md#library-discovery). A procedure or `source`
 boundary consumes one ordinary `return` level. A top-level `return` therefore
 ends the entry script successfully.
 

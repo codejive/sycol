@@ -1,4 +1,4 @@
-# Literal host filesystem operations; Tcl option parsing lives in sdk/files.tcl.
+# Literal host filesystem operations; Tcl option parsing lives in lib/files.tcl.
 sy_file_path() {
     R=$1
     case $R in

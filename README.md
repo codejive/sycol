@@ -33,7 +33,8 @@ Targets: **Bash 3.2+** with 64-bit shell arithmetic, and **Windows PowerShell
 | Bash | `./sycol examples/hello.tcl Alice Bob` |
 | CMD/Pwsh | `.\sycol examples/hello.tcl Alice Bob` |
 
-Paths resolve from the current working directory. There is no REPL, stdin
+Entry-script paths resolve from the current working directory. Only `core.tcl`
+loads automatically; use `source files.tcl` for filesystem/path commands. There is no REPL, stdin
 script mode, or `-c` mode. Add `.sycol/bin/` to `PATH` for direct invocation,
 or copy the two root wrappers and the entire `.sycol/` directory into your
 project. See [running scripts](docs/running.md) for installation, version

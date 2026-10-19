@@ -2,7 +2,7 @@
 # sycol: a string-only Tcl subset. Bash 3.2+, no eval of host source.
 # Internal functions return through R (value), C (completion), RC/RL (return).
 R= C=0 RC=0 RL=0 F=0 NF=0 DEPTH=0
-VK=() VV=() GK=() PN=() PA=() PB=() PARENT=(0) NN=() NH=()
+VK=() VV=() GK=() PN=() PA=() PB=() PARENT=(0) NN=() NH=() NATIVE_FILES=() NATIVE_ERRORS=()
 
 # Native handlers receive literal arguments and set R/C, without stdout results.
 sy_register() { NN+=("$1"); NH+=("$2"); }
@@ -258,42 +258,119 @@ dispatch() {
     local cmd=$1; shift
     local i
     R=; C=0
-    # Script procedures can override any command.
-    for ((i=0;i<${#PN[@]};i++)); do
-        if [[ ${PN[i]} == "$cmd" ]]; then invoke_proc "$i" "$@"; return; fi
-    done
+    # Native commands always win, including over later Tcl definitions.
     for ((i=${#NN[@]}-1;i>=0;i--)); do
         if [[ ${NN[i]} == "$cmd" ]]; then "${NH[i]}" "$@"; return; fi
     done
+    for ((i=0;i<${#PN[@]};i++)); do
+        if [[ ${PN[i]} == "$cmd" ]]; then invoke_proc "$i" "$@"; return; fi
+    done
     fail "unknown command: $cmd"
 }
-# Discovery uses bytewise filename order; keep library filenames lowercase ASCII.
-library_files() {
-    local LC_ALL=C file
-    LIBRARY_FILES=()
-    if [[ ! -d $1 || ! -r $1 || ! -x $1 ]]; then fail "cannot read library directory: $1"; return 1; fi
-    for file in "$1"/*"$2"; do
-        [[ ${file##*/} == .* ]] && continue
-        [[ -f $file ]] && LIBRARY_FILES+=("$file")
+# Lexical absolute paths: collapse separators and dot components, not symlinks.
+sy_path() {
+    local path=$1 part rest out= count
+    local -a parts=()
+    [[ $path == /* ]] || path=$PWD/$path
+    rest=$path/
+    while [[ $rest == */* ]]; do
+        part=${rest%%/*}; rest=${rest#*/}
+        case $part in
+            ''|.) ;;
+            ..) count=${#parts[@]}; if ((count)); then unset 'parts[count-1]'; fi;;
+            *) parts+=("$part");;
+        esac
     done
-    return 0
+    for part in "${parts[@]}"; do out+=/$part; done
+    R=${out:-/}
+}
+sy_init_path() {
+    local name=$1 value=$2 separator=$3 part
+    local -a paths=()
+    while [[ $value == *"$separator"* ]]; do
+        part=${value%%"$separator"*}; value=${value#*"$separator"}
+        [[ -z $part ]] || paths+=("$part")
+    done
+    [[ -z $value ]] || paths+=("$value")
+    quote_list "${paths[@]}"; vset "::$name" "$R"
+}
+sy_init_paths() {
+    local separator=:
+    # MSYS/Git Bash uses Windows environment path-list separators too.
+    case ${OSTYPE-} in msys*|cygwin*) separator=';';; esac
+    sy_init_path sycol_sdk_path "${SYCOL_SDK_PATH-$SYCOL_HOME/../lib}" "$separator"
+    sy_init_path sycol_native_path "${SYCOL_NATIVE_PATH-$SYCOL_HOME/../native}" "$separator"
+    sy_init_path sycol_source_path "${SYCOL_SOURCE_PATH-}" "$separator"
+}
+# FIND is separate from C: an absent optional backend is not an error.
+sy_find_file() {
+    local name=$1 relative=$2 directory
+    local -a ITEMS=() paths=()
+    FIND=0
+    vget "::$name"; ((C)) && return
+    parse_list "$R"; ((C)) && return; paths=("${ITEMS[@]}")
+    for directory in "${paths[@]}"; do
+        [[ -z $directory ]] && continue
+        sy_path "$directory/$relative"
+        if [[ -e $R || -L $R ]]; then FIND=1; return; fi
+    done
+    R=
 }
 load_native() {
-    local file
-    local -a LIBRARY_FILES=()
-    library_files "$SYCOL_HOME/../native" .sh || return 1
-    for file in "${LIBRARY_FILES[@]}"; do
-        if ! source "$file"; then fail "cannot load native file: $file"; return 1; fi
+    local relative=$1 required=${2:-0} file index
+    sy_find_file sycol_native_path "$relative"; ((C)) && return
+    if (( ! FIND )); then
+        if ((required)); then fail "cannot find native file: $relative"; fi
+        return
+    fi
+    file=$R
+    for ((index=0;index<${#NATIVE_FILES[@]};index++)); do
+        if [[ ${NATIVE_FILES[index]} == "$file" ]]; then
+            if [[ -n ${NATIVE_ERRORS[index]} ]]; then fail "${NATIVE_ERRORS[index]}"; else R=; fi
+            return
+        fi
     done
+    index=${#NATIVE_FILES[@]}; NATIVE_FILES+=("$file")
+    NATIVE_ERRORS+=("cannot load native file: $file")
+    if [[ ! -f $file || ! -r $file ]] || ! source "$file"; then
+        fail "${NATIVE_ERRORS[index]}"; return
+    fi
+    NATIVE_ERRORS[index]=; R=; C=0
+}
+sy_source_file() {
+    local requested=$1 direct=${2:-0} file= root module= candidate
+    local -a ITEMS=() roots=()
+    if [[ -z $requested ]]; then fail "cannot read file: $requested"; return; fi
+    if ((direct)) || [[ $requested == /* || $requested == ./* || $requested == ../* ]]; then
+        sy_path "$requested"; file=$R
+    else
+        sy_find_file sycol_sdk_path "$requested"; ((C)) && return
+        if ((FIND)); then file=$R
+        else
+            sy_find_file sycol_source_path "$requested"; ((C)) && return
+            if ((FIND)); then file=$R; fi
+        fi
+    fi
+    if [[ -z $file ]]; then fail "cannot read file: $requested"; return; fi
+    vget ::sycol_sdk_path; ((C)) && return
+    parse_list "$R"; ((C)) && return; roots=("${ITEMS[@]}")
+    for root in "${roots[@]}"; do
+        [[ -z $root ]] && continue
+        sy_path "$root"; candidate=${R%/}/
+        if [[ $file == "$candidate"* ]]; then module=${file#"$candidate"}; break; fi
+    done
+    # Check/read the chosen Tcl file before executing any matching host code.
+    sy_read_text "$file" "$requested"; ((C)) && return
+    local text=${R//$'\r\n'/$'\n'}
+    if [[ $module == *.tcl ]]; then
+        load_native "${module%.tcl}.sh"; ((C)) && return
+    fi
+    eval_script "$text"; finish_return
 }
 load_sdk() {
-    local file
-    local -a LIBRARY_FILES=()
-    library_files "$SYCOL_HOME/../sdk" .tcl || return
-    for file in "${LIBRARY_FILES[@]}"; do
-        dispatch source "$file"
-        if ((C)); then R="cannot load SDK file: $file: $R"; return; fi
-    done
+    sy_find_file sycol_sdk_path core.tcl; ((C)) && return
+    if (( ! FIND )); then fail 'cannot find SDK file: core.tcl'; return; fi
+    dispatch source "$R"
 }
 load_version() {
     local version
@@ -316,14 +393,16 @@ main() {
     local script=$1; shift
     quote_list "$@"; vset argv "$R"; vset argc "$#"; vset argv0 "$script"; vset sycol_host bash
     load_sdk
-    if ((C==0)); then dispatch source "$script"; fi
+    if ((C==0)); then sy_source_file "$script" 1; fi
     if ((C)); then printf 'sycol: %s (completion %s)\n' "$R" "$C" >&2; return 1; fi
 }
 # Capture the installation location before an embedded caller can change cwd.
 SYCOL_HOME=${BASH_SOURCE[0]%/*}
 [[ $SYCOL_HOME == "${BASH_SOURCE[0]}" ]] && SYCOL_HOME=.
 [[ $SYCOL_HOME == /* ]] || SYCOL_HOME=$PWD/$SYCOL_HOME
-if ! load_native; then
+sy_init_paths
+load_native core.sh 1
+if ((C)); then
     printf 'sycol: %s (completion %s)\n' "$R" "$C" >&2
     return 1 2>/dev/null || exit 1
 fi

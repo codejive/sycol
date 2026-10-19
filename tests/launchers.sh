@@ -6,16 +6,16 @@ engine=${SYCOL_BASH:-bash}
 temp=$(mktemp -d "${TMPDIR:-/tmp}/sycol-launchers.XXXXXXXX")
 cleanup() {
     rm -f -- "$temp/expected" "$temp/actual" "$temp/version.tcl" "$temp/install with spaces/.sycol/VERSION"
-    rm -f -- "$temp/install with spaces/.sycol/bin/sycol" "$temp/install with spaces/.sycol/native/"* "$temp/install with spaces/.sycol/sdk/"* "$temp/install with spaces/sycol"
-    rmdir -- "$temp/install with spaces/.sycol/bin" "$temp/install with spaces/.sycol/native" "$temp/install with spaces/.sycol/sdk" "$temp/install with spaces/.sycol" "$temp/install with spaces" "$temp"
+    rm -f -- "$temp/install with spaces/.sycol/bin/sycol" "$temp/install with spaces/.sycol/native/"* "$temp/install with spaces/.sycol/lib/"* "$temp/install with spaces/sycol"
+    rmdir -- "$temp/install with spaces/.sycol/bin" "$temp/install with spaces/.sycol/native" "$temp/install with spaces/.sycol/lib" "$temp/install with spaces/.sycol" "$temp/install with spaces" "$temp"
 }
 trap cleanup EXIT
-mkdir -p "$temp/install with spaces/.sycol/bin" "$temp/install with spaces/.sycol/native" "$temp/install with spaces/.sycol/sdk"
+mkdir -p "$temp/install with spaces/.sycol/bin" "$temp/install with spaces/.sycol/native" "$temp/install with spaces/.sycol/lib"
 cp sycol "$temp/install with spaces/sycol"
 cp .sycol/bin/sycol "$temp/install with spaces/.sycol/bin/sycol"
 cp .sycol/VERSION "$temp/install with spaces/.sycol/VERSION"
 cp .sycol/native/* "$temp/install with spaces/.sycol/native/"
-cp .sycol/sdk/* "$temp/install with spaces/.sycol/sdk/"
+cp .sycol/lib/* "$temp/install with spaces/.sycol/lib/"
 # Source the implementation to encode the expected list, not the root launcher.
 source ./.sycol/bin/sycol
 arguments=('' 'two words' 'say "hello"' 'tail\' 'a&b|c<d>e(f)^g!h' '$literal;[brackets]' '100%' '--version')
@@ -50,7 +50,7 @@ for query in --version "$temp/version.tcl"; do
 done
 if "$engine" "$temp/install with spaces/sycol" --version extra > "$temp/actual" 2>&1; then exit 1; else [[ $? == 2 ]]; fi
 # Version queries do not evaluate SDK files.
-printf '%s\n' 'error version-must-not-load-sdk' > "$temp/install with spaces/.sycol/sdk/0-broken.tcl"
+printf '%s\n' 'error version-must-not-load-sdk' > "$temp/install with spaces/.sycol/lib/core.tcl"
 "$engine" "$temp/install with spaces/sycol" --version > "$temp/actual"
 cmp "$temp/expected" "$temp/actual"
 for value in '' 'invalid version'; do
@@ -62,7 +62,7 @@ rm -- "$temp/install with spaces/.sycol/VERSION"
 if "$engine" "$temp/install with spaces/sycol" --version > "$temp/actual" 2>&1; then exit 1; else [[ $? == 1 ]]; fi
 [[ $(< "$temp/actual") == 'sycol: cannot read version file (completion 1)' ]]
 cp "$root/.sycol/VERSION" "$temp/install with spaces/.sycol/VERSION"
-rm -- "$temp/install with spaces/.sycol/sdk/0-broken.tcl"
+cp "$root/.sycol/lib/core.tcl" "$temp/install with spaces/.sycol/lib/core.tcl"
 quote_list "${arguments[@]}"
 printf '%s\n' "${#arguments[@]}" "$root/tests/fixtures/argv.tcl" "$R" > "$temp/expected"
 # Exercise shebang execution and command lookup for both PATH entry points.

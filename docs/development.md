@@ -36,7 +36,7 @@ skips setup and host checks; use the drivers for complete verification.
 | `tests/exec.tcl`, `fixtures/probe.sh`, `fixtures/probe.ps1` | Literal process arguments, stdout trimming, inherited stderr, nonzero exits, capture records, exact line endings, concurrent large streams, and cwd |
 | `tests/files-move.tcl` | Move operations, replacement, failure retention, and cross-filesystem behavior when fixture roots permit it |
 | `tests/native.tcl` | Registered native handler behavior |
-| `tests/discovery.tcl`, `discovery.sh`, `discovery.ps1` | Copied-installation loading order/filtering, overrides, embedding, empty libraries, and startup failures |
+| `tests/discovery.tcl`, `discovery.sh`, `discovery.ps1` | Copied-installation search paths, optional loading, native precedence, repeated source, overrides, embedding, and startup failures |
 | `tests/encoding.tcl`, `encoding.sh`, `encoding.ps1` | UTF-8/BOM, source line endings, and NUL handling |
 | `tests/launchers.sh`, `launchers.ps1` | Entry points, versions, PATH lookup, arguments, exit propagation, and Windows batch/CMD quoting |
 | `tests/timing.tcl`, `timing-check.sh`, `timing-check.ps1`, `fixtures/timings-*.tsv` | Timing helper semantics, report formatting, configuration, comparisons, and warnings |
@@ -54,7 +54,7 @@ options, and behavior before adding a command. Follow Tcl when the additional
 cost is negligible; explain material costs and a low-cost aligned alternative
 before implementing a departure.
 
-Prefer shared procedures in `.sycol/sdk/`; add native code only for evaluator
+Prefer shared procedures in `.sycol/lib/`; add native code only for evaluator
 mechanisms or required host facilities. Keep Bash and PowerShell equivalent
 in results, completion codes, argument boundaries, and errors. Preserve
 Bash 3.2+ and Windows PowerShell 5.1+ support: avoid newer-host-only features.

@@ -25,6 +25,7 @@ measure 'load SDK' 5 load_sdk
 # measure captures timing in a subshell, so its SDK definitions do not persist.
 load_sdk
 if ((C)); then printf 'benchmark failed: %s\n' "$R" >&2; exit 1; fi
+dispatch source files.tcl
 measure 'file exists (SDK)' 5 eval_script 'file exists .sycol/VERSION'
 measure 'file invalid prefix (SDK)' 5 eval_script 'catch {file c a b}'
 measure 'pathtype long path (SDK)' 5 eval_script 'file pathtype relative/long-temporary-directory/another-segment/filesystem'

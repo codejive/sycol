@@ -49,8 +49,9 @@ sycol examples/hello.tcl Alice "Bob Smith"
 ```
 
 The wrappers preserve the working directory and interpreter exit status.
-Script paths, `source`, and all other relative file paths resolve from that
-directory, not from the launcher or currently sourced file. Use an absolute
+Entry-script paths and relative file operations resolve from that directory.
+`source` searches configured library paths unless its path is absolute or begins
+with `./` or `../`; it never resolves from the containing file. Use an absolute
 launcher path to invoke Sycol from another directory.
 
 If Windows policy prevents unsigned scripts, use your normal script-signing
@@ -131,14 +132,19 @@ Save all `.tcl` source as UTF-8. A leading UTF-8 BOM is accepted; `source`
 normalizes CRLF to LF. Encoding is assumed rather than validated; malformed
 UTF-8 and other encodings are unsupported, and NUL in text files is an error.
 
-Sycol automatically loads direct native files for its host, then direct SDK
-`.tcl` files before your entry script. Use lowercase ASCII library filenames;
-files load alphabetically, independently of locale. Dot-prefixed files and
-subdirectories are ignored. SDK files should define procedures; native files
-should define helpers and register handlers. Neither should execute commands
-requiring another library during loading. Add application procedures in
-separate files and load them with `source`; see
-[library discovery](implementation.md#library-discovery).
+Sycol loads only the native core and `core.tcl` automatically. Load optional
+filesystem/path operations explicitly:
+
+```tcl
+source files.tcl
+puts [file exists notes.txt]
+```
+
+Use `source ./local.tcl` for a cwd-relative file. Other relative names search
+SDK directories, then user source directories. Configure `SYCOL_SDK_PATH`,
+`SYCOL_NATIVE_PATH`, and `SYCOL_SOURCE_PATH` with OS path-list separators, or
+modify their Sycol list globals. See [library discovery](implementation.md#library-discovery)
+for defaults, overrides, native activation, and compatibility requirements.
 
 Scripts have the filesystem and process access of their host shell. Run
 trusted scripts.

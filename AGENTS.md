@@ -1,7 +1,15 @@
 # Working on Sycol
 
-- Always use Conventional Commits when committing with Git. Describe the change
-  clearly without making commit messages overly verbose.
+- Always use Conventional Commits when committing with Git. Write a descriptive
+  subject explaining the main change and its purpose or resulting behavior.
+  Add a short body only when it contributes useful change information, such as
+  motivation, compatibility consequences, or a significant design tradeoff.
+  Exclude procedural details: tests run, validation results, runtime versions
+  used for testing, checks performed, and development steps belong in the work
+  report, not the commit message. Describe changes to tests when those changes
+  are themselves significant, but do not report executing them. Avoid vague
+  labels, exhaustive lists of minor edits, and filler; every sentence should
+  help a reader understand what changed or why.
 - Read [SPEC.md](SPEC.md) before changing behavior; it defines the language,
   SDK, compatibility boundaries, and extension contracts. See [README.md](README.md)
   for a quick start and [docs/development.md](docs/development.md) for test commands.

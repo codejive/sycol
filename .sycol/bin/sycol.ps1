@@ -1,11 +1,14 @@
 # sycol: PowerShell 5.1+ implementation of the string-only Tcl subset.
 # Dot-source to embed; native commands set Sy.R / Sy.C and emit no pipeline data.
 $script:Sy = @{ R=''; C=0; RC=0; RL=0; F=0; NF=0; Depth=0;
-    Vars=@{}; Procs=@{}; Parent=@{0=0}; Native=@{} }
+    Vars=@{}; Procs=@{}; Parent=@{0=0}; Native=@{}; NativeFiles=@{} }
 $script:SyHome = $PSScriptRoot
 # Tcl names are case-sensitive, unlike ordinary PowerShell hashtables.
-foreach ($table in @('Vars','Procs','Native','Aliases')) {
+foreach ($table in @('Vars','Procs','Native','Aliases','NativeFiles')) {
     $script:Sy[$table]=New-Object System.Collections.Hashtable ([StringComparer]::Ordinal)
+}
+if ([IO.Path]::DirectorySeparatorChar -eq '\') {
+    $script:Sy.NativeFiles=New-Object System.Collections.Hashtable ([StringComparer]::OrdinalIgnoreCase)
 }
 
 function Set-SyError([string]$Message) { $script:Sy.R=$Message; $script:Sy.C=1 }
@@ -226,23 +229,96 @@ function Register-SyNative([string]$Name, [scriptblock]$Handler) { $script:Sy.Na
 function Invoke-SyCommand([string[]]$Words) {
     $cmd=$Words[0]; $a=@(); if ($Words.Count -gt 1) { $a=$Words[1..($Words.Count-1)] }
     $script:Sy.R=''; $script:Sy.C=0
-    if ($script:Sy.Procs.ContainsKey($cmd)) { Invoke-SyProcedure $script:Sy.Procs[$cmd] $a; return }
     if ($script:Sy.Native.ContainsKey($cmd)) { & $script:Sy.Native[$cmd] $a; return }
+    if ($script:Sy.Procs.ContainsKey($cmd)) { Invoke-SyProcedure $script:Sy.Procs[$cmd] $a; return }
     Set-SyError "unknown command: $cmd"
 }
-# Exact extensions and non-hidden direct files, in culture-independent order.
-function Get-SyLibraryFiles([string]$Directory, [string]$Extension) {
-    [string[]]$files=@([IO.Directory]::GetFiles($Directory) | Where-Object {
-        ![IO.Path]::GetFileName($_).StartsWith('.') -and [IO.Path]::GetExtension($_) -ceq $Extension
-    })
-    [Array]::Sort($files, [StringComparer]::Ordinal)
-    return $files
+# Absolute lexical paths; provider resolution follows PowerShell's working directory.
+function Get-SyPath([string]$Path) {
+    return [IO.Path]::GetFullPath($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path))
+}
+function Initialize-SyPaths {
+    foreach ($entry in @(@('SDK','lib'),@('NATIVE','native'),@('SOURCE',''))) {
+        $value=[Environment]::GetEnvironmentVariable('SYCOL_'+$entry[0]+'_PATH')
+        $paths=@()
+        if ($null -eq $value) {
+            if ($entry[1]) { $paths=@(Get-SyPath "$script:SyHome/../$($entry[1])") }
+        } else {
+            $paths=@($value.Split([IO.Path]::PathSeparator) | Where-Object { $_.Length })
+        }
+        ConvertTo-SyList $paths
+        Set-SyVariable ('::sycol_'+$entry[0].ToLowerInvariant()+'_path') $script:Sy.R
+    }
+}
+function Find-SyFile([string]$Variable,[string]$Relative) {
+    Get-SyVariable "::$Variable"; if ($script:Sy.C) { return $null }
+    $paths=ConvertFrom-SyList $script:Sy.R; if ($script:Sy.C) { return $null }
+    foreach ($directory in $paths) {
+        if (!$directory.Length) { continue }
+        try {
+            $file=Get-SyPath "$directory/$Relative"
+            # Includes directories: a bad first match must not fall through.
+            if (Test-Path -LiteralPath $file -ErrorAction Stop) { return $file }
+        } catch { Set-SyError "invalid search path: $directory"; return $null }
+    }
+    return $null
+}
+function Import-SyNative([string]$Relative,[switch]$Required) {
+    $file=Find-SyFile sycol_native_path $Relative; if ($script:Sy.C) { return }
+    if ($null -eq $file) {
+        if ($Required) { Set-SyError "cannot find native file: $Relative" }
+        return
+    }
+    if ($script:Sy.NativeFiles.ContainsKey($file)) {
+        if ($script:Sy.NativeFiles[$file]) { Set-SyError $script:Sy.NativeFiles[$file] }
+        return
+    }
+    $message="cannot load native file: $file"
+    $script:Sy.NativeFiles[$file]=$message
+    $preference=$ErrorActionPreference
+    try {
+        $ErrorActionPreference='Stop'
+        if (![IO.File]::Exists($file)) { throw 'not a file' }
+        # Native helper functions must use script: scope to survive this loader.
+        . $file
+        $script:Sy.NativeFiles[$file]=''
+        $script:Sy.R=''; $script:Sy.C=0
+    } catch { Set-SyError $message }
+    finally { $ErrorActionPreference=$preference }
+}
+function Invoke-SySource([string]$Requested,[switch]$Direct) {
+    try {
+        if (!$Requested.Length) { Set-SyError "cannot read file: $Requested"; return }
+        $file=$null
+        $explicit=$Direct -or [IO.Path]::IsPathRooted($Requested) -or $Requested -cmatch '^\.\.?[/\\]'
+        if ($explicit) { $file=Get-SyPath $Requested }
+        else {
+            $file=Find-SyFile sycol_sdk_path $Requested; if ($script:Sy.C) { return }
+            if ($null -eq $file) { $file=Find-SyFile sycol_source_path $Requested; if ($script:Sy.C) { return } }
+        }
+        if ($null -eq $file) { Set-SyError "cannot read file: $Requested"; return }
+        Get-SyVariable ::sycol_sdk_path; if ($script:Sy.C) { return }
+        $roots=ConvertFrom-SyList $script:Sy.R; if ($script:Sy.C) { return }
+        $comparison=[StringComparison]::Ordinal
+        if ([IO.Path]::DirectorySeparatorChar -eq '\') { $comparison=[StringComparison]::OrdinalIgnoreCase }
+        $module=''
+        foreach ($root in $roots) {
+            if (!$root.Length) { continue }
+            $prefix=(Get-SyPath $root).TrimEnd([IO.Path]::DirectorySeparatorChar)+[IO.Path]::DirectorySeparatorChar
+            if ($file.StartsWith($prefix,$comparison)) { $module=$file.Substring($prefix.Length); break }
+        }
+        Invoke-SyNativeRead readfile @($file) $Requested; if ($script:Sy.C) { return }
+        $text=$script:Sy.R.Replace("`r`n","`n")
+        if ($module.EndsWith('.tcl',[StringComparison]::Ordinal)) {
+            Import-SyNative ($module.Substring(0,$module.Length-4)+'.ps1'); if ($script:Sy.C) { return }
+        }
+        Invoke-SyScript $text; Complete-SyReturn
+    } catch { Set-SyError "cannot source file: $Requested" }
 }
 function Import-SySdk {
-    foreach ($file in @(Get-SyLibraryFiles "$script:SyHome/../sdk" '.tcl')) {
-        Invoke-SyCommand @('source',$file)
-        if ($script:Sy.C) { $script:Sy.R="cannot load SDK file: ${file}: $($script:Sy.R)"; return }
-    }
+    $file=Find-SyFile sycol_sdk_path core.tcl; if ($script:Sy.C) { return }
+    if ($null -eq $file) { Set-SyError 'cannot find SDK file: core.tcl'; return }
+    Invoke-SyCommand @('source',$file)
 }
 function Start-Sycol([string[]]$Arguments) {
     $ErrorActionPreference='Stop'
@@ -264,19 +340,16 @@ function Start-Sycol([string[]]$Arguments) {
     Set-SyVariable argv0 $file; Set-SyVariable sycol_host powershell
     try {
         Import-SySdk
-        if (!$script:Sy.C) { Invoke-SyCommand @('source',$file) }
+        if (!$script:Sy.C) { Invoke-SySource $file -Direct }
     } catch { Set-SyError "host failure: $($_.Exception.Message)" }
     if ($script:Sy.C) { [Console]::Error.WriteLine("sycol: $($script:Sy.R) (completion $($script:Sy.C))"); return 1 }
     return 0
 }
-# Dot-source at this scope so module helper functions survive embedding.
-$syLoadPreference=$ErrorActionPreference
-try {
-    $ErrorActionPreference='Stop'
-    foreach ($syNativeFile in @(Get-SyLibraryFiles "$script:SyHome/../native" '.ps1')) {
-        try { . $syNativeFile } catch { throw "cannot load native file: ${syNativeFile}: $($_.Exception.Message)" }
-    }
-} finally {
-    $ErrorActionPreference=$syLoadPreference
+Initialize-SyPaths
+Import-SyNative core.ps1 -Required
+if ($script:Sy.C) {
+    if ($MyInvocation.InvocationName -eq '.') { throw $script:Sy.R }
+    [Console]::Error.WriteLine("sycol: $($script:Sy.R) (completion $($script:Sy.C))")
+    exit 1
 }
 if ($MyInvocation.InvocationName -ne '.') { exit (Start-Sycol ([string[]]$args)) }

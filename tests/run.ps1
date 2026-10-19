@@ -62,7 +62,7 @@ try {
         if ($Words.Count -ne 1) { Set-SyArity 'host.echo value'; return }
         $script:Sy.R=$Words[0]; $script:Sy.C=0
     }
-    Measure-SyTiming group native { Invoke-SyCommand @('source','tests/native.tcl') }
+    Measure-SyTiming group native { Invoke-SyCommand @('source','./tests/native.tcl') }
     if ($script:Sy.C) { throw $script:Sy.R }
     ConvertTo-SyList @($engine,'-NoProfile','-ExecutionPolicy','Bypass','-File',"$root/tests/fixtures/probe.ps1")
     $probe=$script:Sy.R
@@ -77,6 +77,7 @@ try {
     # This is the fixed fixture subtree of the unique test directory. Use the
     # link-aware helper so cleanup never descends through symbolic links.
     . "$root/.sycol/bin/sycol.ps1"
+    Import-SyNative files.ps1
     Remove-SyFile "$temp/filesystem" $true $true
     if ([IO.Directory]::Exists("$temp/move-source")) { Remove-SyFile "$temp/move-source" $true $true }
     # A unique fixture under the explicit workspace .test-tmp directory.

@@ -6,9 +6,10 @@ $timingWatch=[Diagnostics.Stopwatch]::StartNew()
 Write-SyTiming phase "$($args[0])/native-load" ([string]$timingWatch.ElapsedMilliseconds)
 $script:TimingScript=$args[0]
 $script:TimingSource=$script:Sy.Native['source']
+$script:TimingSdkRoot=(Get-SyPath "$script:SyHome/../lib")+[IO.Path]::DirectorySeparatorChar
 Register-SyNative source {
     param([string[]]$Words)
-    if ($Words.Count -eq 1 -and ($Words[0].StartsWith("$script:SyHome/../sdk/",[StringComparison]::Ordinal) -or $Words[0].StartsWith("$script:SyHome/../sdk\",[StringComparison]::Ordinal))) {
+    if ($Words.Count -eq 1 -and ($Words[0].StartsWith($script:TimingSdkRoot,[StringComparison]::OrdinalIgnoreCase) -or $Words[0] -ceq 'files.tcl')) {
         Measure-SyTiming phase "$script:TimingScript/sdk/$([IO.Path]::GetFileName($Words[0]))" { & $script:TimingSource $Words }
     } else { & $script:TimingSource $Words }
 }

@@ -28,6 +28,7 @@ try {
     "PowerShell $($PSVersionTable.PSVersion); runtime $Runtime; one warmup per case"
     Measure-SyCase 'readfile 64 KiB' 20 { Invoke-SyNativeRead 'readfile' @($path) }
     Measure-SyCase 'load SDK' 5 { Import-SySdk }
+    Invoke-SyCommand @('source','files.tcl')
     Measure-SyCase 'file exists (SDK)' 5 { Invoke-SyScript 'file exists .sycol/VERSION' }
     Measure-SyCase 'file invalid prefix (SDK)' 5 { Invoke-SyScript 'catch {file c a b}' }
     Measure-SyCase 'pathtype long path (SDK)' 5 {

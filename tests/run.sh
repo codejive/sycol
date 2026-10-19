@@ -48,7 +48,7 @@ timing_measure group files-move "$engine" tests/timed.sh tests/files-move.tcl "$
 source ./.sycol/bin/sycol
 host_echo() { if (($#!=1)); then arity 'host.echo value'; return; fi; R=$1; C=0; }
 sy_register host.echo host_echo
-timing_measure group native dispatch source tests/native.tcl
+timing_measure group native dispatch source ./tests/native.tcl
 if ((C)); then printf '%s\n' "$R" >&2; exit 1; fi
 quote_list "$(command -v "$engine")" "$root/tests/fixtures/probe.sh"
 probe=$R

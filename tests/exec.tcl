@@ -1,5 +1,5 @@
 # argv[0] is a list containing a native executable and its probe arguments.
-source tests/test-run.tcl
+source ./tests/test-run.tcl
 set probe [lindex $argv 0]
 set failed 0
 proc check {name expected arguments} {

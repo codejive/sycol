@@ -1,4 +1,4 @@
-# Built-in native handlers. Loaded by discovery; no Sycol code runs here.
+# Bootstrap native handlers; no Sycol code runs during registration.
 
 sy_cmd_set() {
     case $# in 1) vget "$1";; 2) vset "$1" "$2";; *) arity 'set name ?value?';; esac
@@ -216,10 +216,10 @@ sy_register 'puts' sy_cmd_puts
 
 sy_read_text() {
     # Byte operations here must not change the locale used by sourced code.
-    local LC_ALL=C value
-    if [[ ! -f $1 || ! -r $1 ]]; then fail "cannot read file: $1"; return; fi
+    local LC_ALL=C value display=${2:-$1}
+    if [[ ! -f $1 || ! -r $1 ]]; then fail "cannot read file: $display"; return; fi
     value=
-    if IFS= read -r -d '' value < "$1"; then fail "NUL in text file: $1"; return; fi
+    if IFS= read -r -d '' value < "$1"; then fail "NUL in text file: $display"; return; fi
     # Accept a leading UTF-8 BOM for both source and readfile.
     # Prefix removal with ${value#pattern} tries successively longer prefixes
     # even when the BOM is absent. Test three bytes and slice only on a match.
@@ -232,7 +232,10 @@ sy_cmd_read() {
     sy_read_text "$1"; ((C)) && return
     if [[ $cmd == source ]]; then R=${R//$'\r\n'/$'\n'}; eval_script "$R"; finish_return; fi
 }
-sy_cmd_source() { sy_cmd_read 'source' "$@"; }
+sy_cmd_source() {
+    if (($#!=1)); then arity 'source path'; return; fi
+    sy_source_file "$1"
+}
 sy_register 'source' sy_cmd_source
 sy_cmd_readfile() { sy_cmd_read 'readfile' "$@"; }
 sy_register 'readfile' sy_cmd_readfile

@@ -7,7 +7,7 @@ timing_test() {
     timing_measure test "$1" eval_script "$2"
 }
 timing_source() {
-    if [[ $# == 1 && $1 == "$SYCOL_HOME/../sdk/"* ]]; then
+    if [[ $# == 1 && ( $1 == "$SYCOL_HOME/../lib/"* || $1 == "${SYCOL_HOME%/*}/lib/"* || $1 == files.tcl ) ]]; then
         timing_measure phase "$timing_script/sdk/${1##*/}" sy_cmd_source "$@"
     else sy_cmd_source "$@"; fi
 }

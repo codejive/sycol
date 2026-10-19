@@ -1,3 +1,4 @@
+source files.tcl
 # Run from the repository root. The same file runs on both implementations.
 set passed 0
 set failed 0
@@ -55,6 +56,7 @@ test unset-variable { set x yes; unset x; catch {set x} } 1
 test empty-variable-name { set {} x } {empty variable name} 1
 test case-sensitive-variables { set Case one; set case two; set Case } one
 test no-command-fallback { sycol_nonexistent_command } {unknown command: sycol_nonexistent_command} 1
+test native-cannot-be-shadowed { proc + {a b} { return shadowed }; + 2 3 } 5
 test eval { set x {+ 6 7}; eval $x } 13
 
 test empty-list { llength {} } 0
@@ -176,10 +178,10 @@ test apply-safe { apply list [list {a; error nope} {$missing}]; llength [apply l
 test apply-caller-scope { set x old; apply set {x new}; set x } new
 test apply-return { proc ar {} {apply return {done}; error nope}; ar } done
 
-test source-caller-scope { set fixture_value before; source tests/fixtures/scope.tcl; set fixture_value } after
-test source-return { source tests/fixtures/return.tcl } sourced
-test source-error { source tests/fixtures/error.tcl } {fixture error} 1
-test source-missing { source tests/fixtures/not-present.tcl } {cannot read file: tests/fixtures/not-present.tcl} 1
+test source-caller-scope { set fixture_value before; source ./tests/fixtures/scope.tcl; set fixture_value } after
+test source-return { source ./tests/fixtures/return.tcl } sourced
+test source-error { source ./tests/fixtures/error.tcl } {fixture error} 1
+test source-missing { source ./tests/fixtures/not-present.tcl } {cannot read file: ./tests/fixtures/not-present.tcl} 1
 test readfile { readfile tests/fixtures/text.txt } "hello\nworld\n"
 test writefile {
     # Test drivers provide an isolated temporary directory via argv.
@@ -202,11 +204,11 @@ test arity-errors {
     set count
 } 24
 
-source tests/parser.tcl
-source tests/lists.tcl
-source tests/files.tcl
-source tests/paths.tcl
-if [ne [getenv SYCOL_TIMING_FILE] {}] {source tests/timing.tcl}
+source ./tests/parser.tcl
+source ./tests/lists.tcl
+source ./tests/files.tcl
+source ./tests/paths.tcl
+if [ne [getenv SYCOL_TIMING_FILE] {}] {source ./tests/timing.tcl}
 
 puts "$passed tests passed; $failed failed"
 if [> $failed 0] { error "$failed tests failed" }
